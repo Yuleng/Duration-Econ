@@ -1,5 +1,6 @@
 ## This is the Rcode for testing the duration paper
 ## Note 2018 Deadline March
+## Rethink the data first
 
 setwd("E:/OneDrive2nd/OneDrive - 广厚设计学校/GIT/Duration-Econ")
 library(survival)
