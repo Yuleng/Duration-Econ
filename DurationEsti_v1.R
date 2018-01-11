@@ -1,8 +1,9 @@
 ## This is the Rcode for testing the duration paper
+setwd("E:/OneDrive2nd/OneDrive - 广厚设计学校/GIT/Duration-Econ")
 library(survival)
 library(survminer)
 ## load time dependent covariates data
-load("C:/Users/YULENG/OneDrive/Documents/R Programming/DurationPaper/DurationTimeCov_v1.RData")
+load("DurationTimeCov_v2.RData")
 tdData <- durB # change to durG for robustness check
 
 tdData$joint_demo <- ifelse(tdData$demo1>5 & tdData$demo2>5, 1, 0)
