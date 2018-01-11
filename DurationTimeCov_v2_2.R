@@ -1,6 +1,7 @@
 # This is an R code to transform the duration data into having time dependent covariates
 # This is a revised version on v_1
 
+setwd("E:/OneDrive2nd/OneDrive - 广厚设计学校/GIT/Duration-Econ")
 
 library(survival)
 ## read mid data from gml 1816-2010
