@@ -15,7 +15,7 @@ mid <- mid[!duplicated(mid[,1:3]),]; mid <- subset(mid,select=-dispnum3)
 
 ## Krustev only counts mid duration; however, the theory predicts on states rationally choosing a time to quit
 temp1 <- mid
-temp1$cens <- ifelse(temp1$outcome %in% c(3,6), 1, 0)
+temp1$cens <- ifelse(temp1$outcome %in% c(3,6), 1, 0)# censor as 0
 temp2 <- mid; names(temp2)[1:2] <- c("ccode2","ccode1"); temp2 <- temp2[,names(mid)]
 temp2$cens <- ifelse(temp1$outcome %in% c(4,6), 1, 0)
 temp <- rbind(temp1,temp2)
