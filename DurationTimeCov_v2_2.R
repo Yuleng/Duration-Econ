@@ -40,7 +40,7 @@ for (i in 1:nrow(pool)){
 }
 ## NOW merge all ind variables
 ## Read the controls
-load("D:/DATA/COW/COWPolityControls2017.RData")
+load("E:/OneDrive2nd/OneDrive - 广厚设计学校/DATA/COW/COWPolityControls2017.RData")
 
 ##########################
 ## democracy
