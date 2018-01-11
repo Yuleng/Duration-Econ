@@ -4,7 +4,7 @@
 
 library(survival)
 ## read mid data from gml 1816-2010
-mid <- read.csv("D:/DATA/COW/MID/GML-MID/gml-ndy.csv")[,c("dispnum3","ccode1","ccode2","year","mindur","maxdur","outcome")]
+mid <- read.csv("E:/OneDrive2nd/OneDrive - 广厚设计学校/DATA/COW/MID/GML-MID/gml-ndy.csv")[,c("dispnum3","ccode1","ccode2","year","mindur","maxdur","outcome")]
 mid <- na.omit(mid)## deleting na values
 ## focus on counting quitters
 mid <- mid[mid$outcome %in% c(3,4,6),] 
