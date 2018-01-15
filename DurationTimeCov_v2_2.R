@@ -30,7 +30,6 @@ temp <- rbind(temp1,temp2)
 
 ## create the basic frame for duration data
 dur <- subset(temp, select=-c(outcome,orig1,orig2));rm(temp1,temp2,temp)
-library(countrycode)
 dur$id <- paste(dur$ccode1,dur$ccode2,dur$year)
 
 ## creating a dataset to hold covariates from the duration dataset
@@ -187,5 +186,5 @@ durG <- tmerge(dur, holdG, id=id,
                powerratio=tdc(day,powerratio))
 
 ## save the data
-save(durB,durG, file="./GIT/Duration-Econ/DurationTimeCov_v2.2.RData")
+save(durB,durG, file="./GIT/Duration-Econ/DurationTimeCov_v2.RData")
 
