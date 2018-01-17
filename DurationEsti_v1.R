@@ -10,8 +10,11 @@ load("DurationTimeCov_v2.RData")
 tdData <- durB # change to durG for robustness check
 
 tdData$joint_demo <- ifelse(tdData$demo1>5 & tdData$demo2>5, 1, 0)
+tdData$lossratio <- tdData$trooploss1/(tdData$trooploss2+1)
+tdData$defense <- tdData$defense1/(tdData$defense2+2) ##defense 2 has 23 -1 values, figure it out later
 ## run preliminary test
-fit1 <- coxph(Surv(tstart, tstop, quit) ~ tradeshare1+tradeshare2+demo1+demo2+mindist+alliance+powerratio, data=tdData);summary(fit1)
+fit1 <- coxph(Surv(tstart, tstop, quit) ~ tradeshare1+tradeshare2+demo1+demo2+trooploss1+trooploss2+mindist+defense1+defense2+powerratio, data=tdData);summary(fit1)
+fit1 <- coxph(Surv(tstart, tstop, quit) ~ tradeshare1+tradeshare2+joint_demo+lossratio+mindist+defense+powerratio, data=tdData);summary(fit1)
 ## mindist can be rerun by conttype, contbinary
 ## alliance can be rerun by igo, affinity
 ## powerratio can be rerun by major1+major2
