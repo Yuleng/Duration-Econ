@@ -5,7 +5,7 @@ setwd("E:/OneDrive2nd/OneDrive - 广厚设计学校")
 
 library(survival)
 ## read mid data from gml 1816-2010
-mid <- read.csv("./DATA/COW/MID/GML-MID/gml-ndy.csv")[,c("dispnum3","ccode1","ccode2","year","mindur","maxdur","outcome","orig1","orig2")]
+mid <- read.csv("./DATA/COW/MID/GML-MID/gml-ndy.csv")[,c("dispnum3","ccode1","ccode2","year","mindur","maxdur","outcome","orig1","orig2","fatalpre1","fatalpre2")]
 mid <- na.omit(mid)## deleting na values
 ## focus on counting quitters
 ## In MID outcome 3 yield by A, 4 yield by B, 6 both side yield
@@ -19,7 +19,21 @@ mid$outcome[mid$outcome==7&mid$orig1==0&mid$orig2==1] <- 7.2 # side 2 as the qui
 mid$outcome[mid$outcome==7&mid$orig1==1&mid$orig2==1] <- 7.3 # side 2 as the quitter
 ## to avoid double counting mids lasting longer than 1 year
 mid <- mid[!duplicated(mid[,1:3]),]; mid <- subset(mid,select=-dispnum3)
-
+## Now add causualty NA values
+mid$fatalpre1[mid$fatalpre1==-9] <- NA; mid$fatalpre2[mid$fatalpre2==-9] <- NA
+## Cannot find annual battle death data; resort to using a time-invariant depend variable
+## Fatality should be weighted by army size
+## USE the cinc data
+## National Power v5.0 1816-2012
+milipersonnel <- read.csv("./DATA/COW/NMC_v4_0/NMC_5_0.csv",na.strings=-9)[,c("ccode","year","milper")]
+milipersonnel$ccode1 <- milipersonnel$ccode2 <- milipersonnel$ccode;
+milipersonnel$milper1 <- milipersonnel$milper2 <- milipersonnel$milper
+mid <- merge(mid, milipersonnel[,c("ccode1", "year", "milper1")], by=c("ccode1","year"), all.x=TRUE)
+mid <- merge(mid, milipersonnel[,c("ccode2", "year", "milper2")], by=c("ccode2","year"), all.x=TRUE)
+mid$trooploss1 <- mid$fatalpre1/(mid$milper1+1)
+mid$trooploss2 <- mid$fatalpre1/(mid$milper2+1)
+library(dplyr)
+mid <- mid %>% select(ccode1, everything())
 
 ## Krustev only counts mid duration; however, the theory predicts on states rationally choosing a time to quit
 temp1 <- mid
@@ -160,7 +174,7 @@ holdG$tradeshare2.net <- holdG$tradeshare2*exp(-holdG$integration2)
 
 ## now assemble the data into having time varying covariates
 dur$dur <- dur$maxdur
-dur <- dur[,c("id","dur","cens")] ## if doing competing risks may change this to status?
+dur <- dur[,c("id","dur","cens","trooploss1","trooploss2")] 
 dur <- tmerge(dur, dur, id=id, quit=event(dur,cens)) # set the range
 durB <- tmerge(dur, holdB, id=id, 
                tradedepend1=tdc(day,tradedepend1), tradedepend2=tdc(day,tradedepend2),
