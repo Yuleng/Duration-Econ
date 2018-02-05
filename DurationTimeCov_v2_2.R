@@ -5,7 +5,7 @@ setwd("E:/OneDrive2nd/OneDrive - 广厚设计学校")
 
 library(survival)
 ## read mid data from gml 1816-2010
-mid <- read.csv("./DATA/COW/MID/GML-MID/gml-ndy.csv")[,c("dispnum3","ccode1","ccode2","year","mindur","maxdur","outcome","orig1","orig2","fatalpre1","fatalpre2")]
+mid <- read.csv("./DATA/COW/MID/GML-MID/gml-ndy.csv")[,c("dispnum3","ccode1","ccode2","year","mindur","maxdur","outcome","orig1","orig2","fatalpre1","fatalpre2","revtype11","revtype12")]
 mid <- na.omit(mid)## deleting na values
 ## focus on counting quitters
 ## In MID outcome 3 yield by A, 4 yield by B, 6 both side yield
