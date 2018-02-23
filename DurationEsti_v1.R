@@ -5,6 +5,12 @@
 setwd("E:/OneDrive2nd/OneDrive - 广厚设计学校/GIT/Duration-Econ")
 library(survival)
 library(survminer)
+
+library(survival)
+library(ranger)
+library(ggplot2)
+library(dplyr)
+library(ggfortify)
 ## load time dependent covariates data
 load("DurationTimeCov_v2.RData")
 tdData <- durB # change to durG for robustness check
@@ -12,6 +18,22 @@ tdData <- durB # change to durG for robustness check
 tdData$joint_demo <- ifelse(tdData$demo1>5 & tdData$demo2>5, 1, 0)
 tdData$lossratio <- tdData$trooploss1/(tdData$trooploss2+1)
 tdData$defense <- tdData$defense1/(tdData$defense2+2) ##defense 2 has 23 -1 values, figure it out later
+tdData$traderatio <- tdData$tradeshare1/(tdData$tradeshare2+1)
+tdData$resolve <- ifelse(tdData$revtype11==1,1,0)
+## run preliminary model
+fit1 <- coxph(Surv(tstart, tstop, quit) ~ traderatio+resolve+joint_demo+lossratio+contbinary+powerratio, data=tdData);summary(fit1)
+fit1 <- coxph(Surv(tstart, tstop, quit) ~ traderatio+resolve+traderatio:resolve+joint_demo+lossratio+contbinary+powerratio, data=tdData);summary(fit1)
+fit1 <- coxph(Surv(tstart, tstop, quit) ~ traderatio+resolve+traderatio:resolve+joint_demo+lossratio+contbinary+powerratio+cluster(dispnum3), data=tdData);summary(fit1)
+
+## try these suggested methods
+## https://rviews.rstudio.com/2017/09/25/survival-analysis-with-r/
+cox_fit1 <- survfit(fit1)
+autoplot(cox_fit1)
+
+aa_fit <-aareg(Surv(tstart, tstop, quit) ~ traderatio+resolve+joint_demo+lossratio+contbinary+powerratio, data=tdData);summary(fit1)
+autoplot(aa_fit)
+
+
 ## run preliminary test
 fit1 <- coxph(Surv(tstart, tstop, quit) ~ tradeshare1+tradeshare2+demo1+demo2+trooploss1+trooploss2+mindist+defense1+defense2+powerratio, data=tdData);summary(fit1)
 fit1 <- coxph(Surv(tstart, tstop, quit) ~ tradeshare1+tradeshare2+joint_demo+lossratio+mindist+defense+powerratio, data=tdData);summary(fit1)
