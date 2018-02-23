@@ -25,6 +25,10 @@ fit1 <- coxph(Surv(tstart, tstop, quit) ~ traderatio+resolve+joint_demo+lossrati
 fit1 <- coxph(Surv(tstart, tstop, quit) ~ traderatio+resolve+traderatio:resolve+joint_demo+lossratio+contbinary+powerratio, data=tdData);summary(fit1)
 fit1 <- coxph(Surv(tstart, tstop, quit) ~ traderatio+resolve+traderatio:resolve+joint_demo+lossratio+contbinary+powerratio+cluster(dispnum3), data=tdData);summary(fit1)
 
+zp1 <- cox.zph(fit1)
+zp1
+plot(zp1[2])
+
 ## try these suggested methods
 ## https://rviews.rstudio.com/2017/09/25/survival-analysis-with-r/
 cox_fit1 <- survfit(fit1)
