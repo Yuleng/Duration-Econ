@@ -176,8 +176,8 @@ holdG$tradeshare2.net <- holdG$tradeshare2*exp(-holdG$integration2)
 
 
 ## now assemble the data into having time varying covariates
-dur$dur <- dur$maxdur
-dur <- dur[,c("id","dur","cens","trooploss1","trooploss2")] 
+dur$dur <- dur$maxdur; dur0<-dur
+dur <- dur[,c("id","dur","cens","trooploss1","trooploss2","dispnum3","revtype11","revtype12")] 
 dur <- tmerge(dur, dur, id=id, quit=event(dur,cens)) # set the range
 durB <- tmerge(dur, holdB, id=id, 
                tradedepend1=tdc(day,tradedepend1), tradedepend2=tdc(day,tradedepend2),
