@@ -21,7 +21,7 @@ mid$outcome[mid$outcome==7&mid$orig1==1&mid$orig2==0] <- 7.1 # side 1 as the qui
 mid$outcome[mid$outcome==7&mid$orig1==0&mid$orig2==1] <- 7.2 # side 2 as the quitter
 mid$outcome[mid$outcome==7&mid$orig1==1&mid$orig2==1] <- 7.3 # side 2 as the quitter
 ## to avoid double counting mids lasting longer than 1 year
-mid <- mid[!duplicated(mid[,1:3]),]; mid <- subset(mid,select=-dispnum3)
+mid <- mid[!duplicated(mid[,1:3]),]
 ## Now add causualty NA values
 mid$fatalpre1[mid$fatalpre1==-9] <- NA; mid$fatalpre2[mid$fatalpre2==-9] <- NA
 ## Cannot find annual battle death data; resort to using a time-invariant depend variable
