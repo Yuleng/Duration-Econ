@@ -92,7 +92,7 @@ effectPlot <- function(fit, t, fun, term, ...) {
     delta <- rep(0, length(b))
     names(delta) <- names(b)
     delta[term] <- 1
-    delta[paste0('tt(', term, ')')] <- fun(t[i])
+    delta[paste0('tt(', term, ')')] <- fun(t[i]) ## figure out this part, so I can first plot the HR
     y[i] <- delta %*% coef(fit)
     v <- delta %*% vcov(fit) %*% delta
     lwr[i] <- y[i] + qnorm(.025)*sqrt(v)
