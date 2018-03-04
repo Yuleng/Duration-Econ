@@ -106,7 +106,7 @@ effectPlot <- function(fit, t, fun, term, ...) {
 
 effectPlot(mod1, 0:1000, as.numeric, 'traderatio', xlab='Time (Days)', ylab='Treatment effect')
 ## still need to tweak it to plot the survival rate
-
+## consider park and hendry 2015, licht2011
 
 ## select the best fit
 ## using log likelihood
