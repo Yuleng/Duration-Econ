@@ -93,6 +93,10 @@ effectPlot <- function(fit, t, fun, term, ...) {
     names(delta) <- names(b)
     delta[term] <- 1
     delta[paste0('tt(', term, ')')] <- fun(t[i]) ## figure out this part, so I can first plot the HR
+    # https://stackoverflow.com/questions/31105216/plotting-estimated-hr-from-coxph-object-with-time-dependent-coefficient-and-spli/31316057#31316057
+    # sth to look into
+    ## maybe plot only the hazard ration instead
+    ## see http://daynebatten.com/2016/01/customer-churn-time-dependent-coefficients/
     y[i] <- delta %*% coef(fit)
     v <- delta %*% vcov(fit) %*% delta
     lwr[i] <- y[i] + qnorm(.025)*sqrt(v)
@@ -107,6 +111,18 @@ effectPlot <- function(fit, t, fun, term, ...) {
 effectPlot(mod1, 0:1000, as.numeric, 'traderatio', xlab='Time (Days)', ylab='Treatment effect')
 ## still need to tweak it to plot the survival rate
 ## consider park and hendry 2015, licht2011
+## My thoughts on plotting the Hazard Ratio
+## A 1OO percent increase of trade ratio can be unrealistic
+## hence, use 1 percent
+hrtrade_resolved <- function(x) exp(0.01*(coef(mod1)["traderatio"]+coef(mod1)["traderatio:resolve"]+coef(mod1)["tt(traderesolve)"]*x))
+hrtrade_unresolved <- function(x) exp(0.01*(coef(mod1)["traderatio"]+coef(mod1)["traderatio:resolve"]*0+coef(mod1)["tt(traderesolve)"]*x*0))
+x <- seq(0,50, length=1000); y1 <- hrtrade_resolved(x); y2 <- hrtrade_unresolved(x)
+hr_plot <- data.frame(time=rep(x,times=2), hr=c(y1,y2), resolve=as.factor(rep(c(1,0),each=length(x))))
+hrggplot <- ggplot(hr_plot, aes(x=time, y=hr, group=resolve)) +
+  geom_line(aes(linetype=resolve)) +
+  labs(y="Hazard Ratio", x="Time") +
+  theme_bw() + theme(panel.border = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"))
+  
 
 ## select the best fit
 ## using log likelihood
