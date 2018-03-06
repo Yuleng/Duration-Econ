@@ -58,25 +58,28 @@ ggadjustedcurves(fit1, data = newdt3, fun = "pct", method="average",
 
 ## This part follows STHDA
 ## http://www.sthda.com/english/wiki/cox-model-assumptions
-##
+
+#################################
 ## testing proportional hazard
+#################################
 ## using the default instead of identity or log
 ## see Terry T.'s response here
 ## http://r.789695.n4.nabble.com/Why-is-transform-quot-km-quot-the-default-for-cox-zph-td797535.html
-test.ph <- cox.zph(fit1)
+
+test.ph <- cox.zph(fit1,transform='rank')#given the proportion of censoring
+## I need to use time transform rank or km suggested by Park2015
 test.ph
-ggcoxzph(test.ph)[1]
-plot(test.ph[2])
-abline(h=0,col=2)
-abline(h=fit1$coef[2], col=3, lwd=2, lty=2)
-## zoom in
-plot(test.ph[2], ylim=c(-2,2))
-abline(h=0,col=2)
-abline(h=fit1$coef[2], col=3, lwd=2, lty=2)
-## zoom in
-plot(test.ph[1], ylim=c(-1,1))
-abline(h=0,col=2)
-abline(h=fit1$coef[1], col=3, lwd=2, lty=2)
+## indentity graph shows the impact of outliers
+ggcoxzph(cox.zph(fit1,transform='identity'), point.col="grey")[2]
+## graph using rank transformation
+ggcoxzph(test.ph, point.col="grey")[2]
+## zoom in shows the relation clearer
+ggcoxzph(test.ph, ylim=c(-2,2), point.col="grey")[2]
+
+## an alternative way to plot
+## plot(test.ph[2], ylim=c(-2,2))
+## abline(h=0,col=2)
+## abline(h=fit1$coef[2], col=3, lwd=2, lty=2)
 
 
 ## deal with ph violation
