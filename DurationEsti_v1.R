@@ -9,8 +9,46 @@ library(survminer)
 library(survival)
 library(ranger)
 library(ggplot2)
+library(plyr)
 library(dplyr)
 library(ggfortify)
+library(grid)
+library(xtable)
+multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
+  
+  # Make a list from the ... arguments and plotlist
+  plots <- c(list(...), plotlist)
+  
+  numPlots = length(plots)
+  
+  # If layout is NULL, then use 'cols' to determine layout
+  if (is.null(layout)) {
+    # Make the panel
+    # ncol: Number of columns of plots
+    # nrow: Number of rows needed, calculated from # of cols
+    layout <- matrix(seq(1, cols * ceiling(numPlots/cols)),
+                     ncol = cols, nrow = ceiling(numPlots/cols))
+  }
+  
+  if (numPlots==1) {
+    print(plots[[1]])
+    
+  } else {
+    # Set up the page
+    grid.newpage()
+    pushViewport(viewport(layout = grid.layout(nrow(layout), ncol(layout))))
+    
+    # Make each plot, in the correct location
+    for (i in 1:numPlots) {
+      # Get the i,j matrix positions of the regions that contain this subplot
+      matchidx <- as.data.frame(which(layout == i, arr.ind = TRUE))
+      
+      print(plots[[i]], vp = viewport(layout.pos.row = matchidx$row,
+                                      layout.pos.col = matchidx$col))
+    }
+  }
+}
+
 ## load time dependent covariates data
 load("DurationTimeCov_v2.RData")
 tdData <- durB # change to durG for robustness check
@@ -23,13 +61,17 @@ tdData$resolve <- ifelse(tdData$revtype11==1,1,0)
 
 ## km plot
 km_fit <- survfit(Surv(tstart,tstop, quit) ~ 1, data=tdData)
-ggsurvplot(km_fit)
+ggsurvplot(km_fit, palette="grey",legend="none")
 
 ## run preliminary model
 # fit1 <- coxph(Surv(tstart, tstop, quit) ~ traderatio+resolve+joint_demo+lossratio+contbinary+powerratio, data=tdData);summary(fit1)
 # fit1 <- coxph(Surv(tstart, tstop, quit) ~ traderatio+resolve+traderatio:resolve+joint_demo+lossratio+contbinary+powerratio, data=tdData);summary(fit1)
 # fit1 <- coxph(Surv(tstart, tstop, quit) ~ traderatio+resolve+traderatio:resolve+joint_demo+lossratio+contbinary+powerratio+cluster(dispnum3), data=tdData);summary(fit1)
 
+#########################################
+## First, fit the model with coxph, jump to the second step as the plots are misguiding and meaningless
+## if ph is violated
+#########################################
 fit1 <- coxph(Surv(tstart, tstop, quit) ~ traderatio+resolve+traderatio:resolve+joint_demo+lossratio+contbinary+powerratio, data=tdData);summary(fit1)
 ###################
 ## Plot the impact of traderatio
@@ -60,7 +102,7 @@ ggadjustedcurves(fit1, data = newdt3, fun = "pct", method="average",
 ## http://www.sthda.com/english/wiki/cox-model-assumptions
 
 #################################
-## testing proportional hazard
+## Second, testing proportional hazard
 #################################
 ## using the default instead of identity or log
 ## see Terry T.'s response here
@@ -69,8 +111,22 @@ ggadjustedcurves(fit1, data = newdt3, fun = "pct", method="average",
 test.ph <- cox.zph(fit1,transform='rank')#given the proportion of censoring
 ## I need to use time transform rank or km suggested by Park2015
 test.ph
+## graph the level of censoring
+# naive way because missing data are ignored
+cen_plot1 <- ggplot(as.data.frame(table(tdData$cens)),aes(x=Var1,y=Freq))+
+             geom_bar(stat="identity")+
+             theme_bw() + theme(panel.border = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"))+
+             xlab("(a) Original Data") 
+# proper way
+cen_plot2 <- ggplot(as.data.frame(table(tdData[rownames(as.data.frame(model.matrix(fit1))), "cens"])),aes(x=Var1,y=Freq))+
+             geom_bar(stat="identity")+
+             theme_bw() + theme(panel.border = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"))+
+             xlab("(b) Data in the Model") 
+# plot the two together
+multiplot(cen_plot1,cen_plot2, cols=2)
+
 ## indentity graph shows the impact of outliers
-ggcoxzph(cox.zph(fit1,transform='identity'), point.col="grey")[2]
+ggcoxzph(cox.zph(fit1,transform='identity'), point.col="grey")[2] #Showcase the need of time transformation Park2015
 ## graph using rank transformation
 ggcoxzph(test.ph, point.col="grey")[2]
 ## zoom in shows the relation clearer
@@ -81,76 +137,78 @@ ggcoxzph(test.ph, ylim=c(-2,2), point.col="grey")[2]
 ## abline(h=0,col=2)
 ## abline(h=fit1$coef[2], col=3, lwd=2, lty=2)
 
-
-## deal with ph violation
-#####################################3
-## follow Patrick Breheny
-## http://myweb.uiowa.edu/pbreheny/7210/f17/notes.html
-## to deal with ph violation, search for best fit, and plot
-## use his function for plotting effect
-effectPlot <- function(fit, t, fun, term, ...) {
-  b <- coef(fit)
-  y <- lwr <- upr <- numeric(length(t))
-  for (i in 1:length(t)) {
-    delta <- rep(0, length(b))
-    names(delta) <- names(b)
-    delta[term] <- 1
-    delta[paste0('tt(', term, ')')] <- fun(t[i]) ## figure out this part, so I can first plot the HR
-    # https://stackoverflow.com/questions/31105216/plotting-estimated-hr-from-coxph-object-with-time-dependent-coefficient-and-spli/31316057#31316057
-    # sth to look into
-    ## maybe plot only the hazard ration instead
-    ## see http://daynebatten.com/2016/01/customer-churn-time-dependent-coefficients/
-    y[i] <- delta %*% coef(fit)
-    v <- delta %*% vcov(fit) %*% delta
-    lwr[i] <- y[i] + qnorm(.025)*sqrt(v)
-    upr[i] <- y[i] + qnorm(.975)*sqrt(v)
-  }
-  plot(t, y, ylim=range(c(lwr, upr)), type='l', las=1, bty='n', ...)
-  polygon(c(t, rev(t)), c(lwr, rev(upr)), col='gray85', border=NA)
-  lines(t, y, lwd=3)
-  abline(h=0, col='gray', lwd=2, lty=2)
-}
-
-effectPlot(mod1, 0:1000, as.numeric, 'traderatio', xlab='Time (Days)', ylab='Treatment effect')
-## still need to tweak it to plot the survival rate
-## consider park and hendry 2015, licht2011
-## My thoughts on plotting the Hazard Ratio
-## A 1OO percent increase of trade ratio can be unrealistic
-## hence, use 1 percent
-hrtrade_resolved <- function(x) exp(0.01*(coef(mod1)["traderatio"]+coef(mod1)["traderatio:resolve"]+coef(mod1)["tt(traderesolve)"]*x))
-hrtrade_unresolved <- function(x) exp(0.01*(coef(mod1)["traderatio"]+coef(mod1)["traderatio:resolve"]*0+coef(mod1)["tt(traderesolve)"]*x*0))
-x <- seq(0,50, length=1000); y1 <- hrtrade_resolved(x); y2 <- hrtrade_unresolved(x)
-hr_plot <- data.frame(time=rep(x,times=2), hr=c(y1,y2), resolve=as.factor(rep(c(1,0),each=length(x))))
-hrggplot <- ggplot(hr_plot, aes(x=time, y=hr, group=resolve)) +
-  geom_line(aes(linetype=resolve)) +
-  labs(y="Hazard Ratio", x="Time") +
-  theme_bw() + theme(panel.border = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"))
-  
-
+################################
+## Now select the best fit
+###############################
 ## select the best fit
 ## using log likelihood
-logLik(mod1)
-lam <- seq(0.1, 10, len=99)
-l <- numeric(length(lam))
+tdData1 <- tdData
+tdData1$traderesolve <- tdData1$traderatio*tdData1$resolve #create the interaction term for tt function
+lam <- seq(0, 99, len=100)
+logL <- aic <- bic <- numeric(length(lam))
 for (i in 1:length(lam)) {
   fit <- coxph(Surv(tstart, tstop, quit) ~ traderatio + resolve + 
                  traderatio:resolve + joint_demo + lossratio + contbinary + 
                  powerratio + tt(resolve) + tt(traderesolve),
-               data=tdData1, tt=function(x, t, ...) {x*exp(-t/lam[i])})
-  l[i] <- logLik(fit)
+               data=tdData1, tt=function(x, t, ...) {x*log(t+lam[i])})
+  logL[i] <- logLik(fit)
+  aic[i] <- AIC(fit)
+  bic[i] <- BIC(fit)
 }
-par(mar=c(5,6,1,1))
-plot(lam, l, type='l', bty='n', las=1, lwd=2,
+#par(mar=c(5,6,1,1))
+plot(lam, logL, type='l', bty='n', las=1, lwd=2,
+     xlab=expression(lambda), ylab='')
+plot(lam, aic, type='l', bty='n', las=1, lwd=2,
+     xlab=expression(lambda), ylab='')
+plot(lam, bic, type='l', bty='n', las=1, lwd=2,
      xlab=expression(lambda), ylab='')
 mtext('Log likelihood', 2, line=4)
 ## now use the best lam to refit the model
-lamhat <- lam[which.max(l)]
-fit <- coxph(Surv(tstart, tstop, quit) ~ traderatio + resolve + 
+lamhat <- lam[which.min(bic)]
+best_fit <- coxph(Surv(tstart, tstop, quit) ~ traderatio + resolve + 
                traderatio:resolve + joint_demo + lossratio + contbinary + 
                powerratio + tt(resolve) + tt(traderesolve),
-             data=tdData1,tt=function(x, t, ...) {x*exp(-t/lamhat)})
-effectPlot(fit, seq(0, 1.5, len=99), function(t) exp(-t/lamhat), 'resolve', xlab='Time (Days)', ylab='Treatment effect')
+             data=tdData1,tt=function(x, t, ...) {x*log(t+lamhat)})
 
+## Now Plot the first difference (percentage change in hazard rate) as
+## suggested by Licht_2011 and by Box-Steffensmeier and Jones (2004, 60)
+## A 1OO percent increase of trade ratio can be unrealistic
+## hence, use 1 percent
+par_traderatio <- summary(best_fit)$coefficients["traderatio",c(1,3)]
+par_traderesolve <- summary(best_fit)$coefficients["traderatio:resolve",c(1,3)]
+par_ttraderesolve <- summary(best_fit)$coefficients["tt(traderesolve)",c(1,3)]
+#first difference function from Licht2011
+hrtrade_resolved <- function(x, par1, par2, par3) (exp(0.01*(par1+par2+par3*x))-1)*100
+hrtrade_unresolved <- function(x, par1, par2, par3) (exp(0.01*(par1+par2*0+par3*x*0))-1)*100
+t <- seq(0,999, length=1000) # time length by day
+sim <- 1000 # number of simulation
+set.seed(11) 
+plot_dat <- data.frame()
+for (i in 1:length(t)){
+  x = t[i]
+  impact = numeric()
+  for (j in 1:sim) {
+    par1 = rnorm(1, mean=par_traderatio[1], sd=par_traderatio[2])
+    par2 = rnorm(1, mean=par_traderesolve[1], sd=par_traderesolve[2])
+    par3 = rnorm(1, mean=par_ttraderesolve[1], sd=par_ttraderesolve[2])
+    impact[j] = hrtrade_resolved(x, par1, par2, par3)
+  }
+  temp = data.frame (time=x, firstdiff=impact)
+  plot_dat = rbind(plot_dat, temp)
+}
+## Plot the impact of trade ratio
+tradeimpactplot <- ggplot(plot_dat, aes(time, firstdiff))+
+                    geom_point(colour="grey",alpha=0.05)+
+                    geom_smooth(colour="black")+ylim(-100,20) +
+                    xlab("Days")+ylab("Percentage Change in Hazard Rate")+
+                    theme_bw() + theme(panel.border = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"))
+
+## Zoom in plot and incorporate the impact of unresolved type 
+zoominplot <- tradeimpactplot+xlim(0,200)+
+              geom_hline(linetype=2,yintercept=hrtrade_unresolved(0,par_traderatio[1],par_traderesolve[1],par_ttraderesolve[1]))+
+              annotate("text", 100, hrtrade_unresolved(0,par_traderatio[1],par_traderesolve[1],par_ttraderesolve[1]), vjust = -1, label = "Unresolved Impact: 0.16")+
+              annotate("text",100,-50,label="Resolved")
+## come back to Licht2011 when writing about interpretation
 
 
 
