@@ -181,7 +181,7 @@ par_ttraderesolve <- summary(best_fit)$coefficients["tt(traderesolve)",c(1,3)]
 hrtrade_resolved <- function(x, par1, par2, par3) (exp(0.01*(par1+par2+par3*x))-1)*100
 hrtrade_unresolved <- function(x, par1, par2, par3) (exp(0.01*(par1+par2*0+par3*x*0))-1)*100
 t <- seq(0,999, length=1000) # time length by day
-sim <- 1000 # number of simulation
+sim <- 100 # number of simulation
 set.seed(11) 
 plot_dat <- data.frame()
 for (i in 1:length(t)){
@@ -210,8 +210,53 @@ zoominplot <- tradeimpactplot+xlim(0,200)+
               annotate("text",100,-50,label="Resolved")
 ## come back to Licht2011 when writing about interpretation
 
+#########################
+## Finally, Hazard Rate change sign
+## According to Ruhe2018 should plot survival rate
+#########################
+## tt function cannot handle prediction now
+## second best choice interaction with time
+## now there seems to be different takes on interacting with start or stop time
+## John Fox interact it with stop time
+## which appears to be close to the best fit model
+tdData2 <- tdData1
+#tdData2$traderatio <- tdData2$traderatio+0.0001 #add this to exclude 0 so that my plots to get around tt function can work
+tdData2$time <- tdData2$tstop
+tdData2$tresolve <- tdData2$resolve*log(tdData1$tstop)
+tdData2$ttraderesolve <- tdData2$traderesolve*log(tdData1$tstop)
+secondbest_fit <- coxph(Surv(tstart, tstop, quit) ~ traderatio + resolve + 
+                  traderesolve + joint_demo + lossratio + contbinary + 
+                  powerratio + tresolve+ttraderesolve,
+                  data=tdData2); summary(secondbest_fit)
+## check the difference
+## summary(best_fit)$coefficients[,1];summary(secondbest_fit)$coefficients[,1]
+## now used survminer's plot
+## Plot the impact of traderatio
+
+dat_fun <- function (tstart, tstop, traderatio, resolve=1, joint_demo=0, lossratio=1, contbinary=1, powerratio=1){
+  num = length(traderatio)
+  len = length(tstart)
+  temp = data.frame(tstart=rep(tstart,num), tstop=rep(tstop,num), quit=rep(0,len*num),
+                    curve=rep(1:num,each=len),
+                    traderatio=rep(traderatio, each=len),
+                    resolve=resolve, traderesolve=rep(traderatio,each=len)*resolve,
+                    joint_demo=joint_demo, lossratio=lossratio, contbinary=contbinary, powerratio=powerratio,
+                    tresolve=log(rep(tstop,2))*resolve,
+                    ttraderesolve=as.vector(outer(log(tstop),traderatio))*resolve)
+  return(temp)
+}
+end <- 200; step <- 1
+t1 <- seq(from=0,to=end-step,by=step)
+t2 <- seq(from=step, to=end, by=step)
+traderatio <- c(0.5,1)
+temp <- dat_fun(t1,t2,traderatio,resolve=1,lossratio=0.1)
 
 
+ggadjustedcurves(secondbest_fit,data=temp,variable="traderatio",method="average")
+
+###############################################################
+## The parts below can be deleted
+#########################################################
 ## People seem to disagree on time interaction
 ## here it is interacted with start time
 ## https://www.r-bloggers.com/dealing-with-non-proportional-hazards-in-r/
