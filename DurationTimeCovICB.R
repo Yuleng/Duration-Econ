@@ -8,6 +8,11 @@ library(countrycode)
 icb <- read.csv("./DATA/icb/icbdy_v12.csv")[,c("crisno","year","statea","stateb")]
 icb2 <- read.csv("./DATA/icb/icb2v12.csv")[,c("crisno","cracid","trgterra","resterra","outfor","viol","issue","gravty")]
 icb2$statea <- icb2$cracid
+## I choose gravity over issue because the former varies within a dyad, the latter does no
+## use crisno 445 Russian-Georgia to illustrate
+## Russia saw it as 1 limited military threat; Georgia saw it as 3 territorial threat
+## the issue variable cannot capture this given it assign both sides as dealing with the same issue
+## in this case 1 military-security issue
 ## first, rearrange icb into directed dyad
 ## also, eliminate double counting by year
 icb <- icb[!duplicated(subset(icb,select=-year)),]

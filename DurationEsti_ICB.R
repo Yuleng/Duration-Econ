@@ -55,10 +55,13 @@ load("DurationTimeCov_ICB.RData")
 tdData <- durB # change to durG for robustness check
 
 tdData$joint_demo <- ifelse(tdData$demo1>5 & tdData$demo2>5, 1, 0)
-tdData$traderatio <- tdData$tradeshare1/(tdData$tradeshare2+1)
+tdData$traderatio <- tdData$tradeshare1/(tdData$tradeshare2+1) ## not like power ratio, because the latter produce too many NA values
 ## need to think more about viol and salience
 ## because viol may affect termination
 tdData$issuesalience <- factor(ifelse(tdData$gravty==6,2,ifelse(tdData$gravty==3,1,0)), levels=c(0,1,2))
+temp <- sapply(levels(tdData$issuesalience), function(x) as.integer(x == tdData$issuesalience))
+colnames(temp) <- paste0("issuesalience",colnames(temp))
+tdData <- cbind(tdData,temp)
 ## instead of factor; maybe transform into binary with three variables can be better
 tdData$traderatio.net <- tdData$tradeshare1.net/(tdData$tradeshare2.net+1)
 
@@ -76,6 +79,7 @@ ggsurvplot(km_fit, palette="grey",legend="none")
 ## if ph is violated
 #########################################
 fit1 <- coxph(Surv(tstart, tstop, quit) ~ traderatio+issuesalience+traderatio:issuesalience+joint_demo+contbinary+powerratio+defense1+defense2, data=tdData);summary(fit1)
+fit1b <- coxph(Surv(tstart, tstop, quit) ~ traderatio+issuesalience1+issuesalience2+traderatio:issuesalience1+traderatio:issuesalience2+joint_demo+contbinary+powerratio+defense1+defense2, data=tdData);summary(fit1b)
 ###################
 ## Plot the impact of traderatio
 temp <- as.data.frame(model.matrix(fit1))
@@ -146,13 +150,13 @@ ggcoxzph(test.ph, ylim=c(-2,2), point.col="grey")[2]
 ## select the best fit
 ## using log likelihood
 tdData1 <- tdData
-#tdData1$tradeissuesalience <- tdData1$traderatio*tdData1$issuesalience #create the interaction term for tt function
+tdData1$tradeissuesalience2 <- tdData1$traderatio*tdData1$issuesalience2 #create the interaction term for tt function
 lam <- seq(0, 99, len=100)
 logL <- aic <- bic <- numeric(length(lam))
 for (i in 1:length(lam)) {
-  fit <- coxph(Surv(tstart, tstop, quit) ~ traderatio + issuesalience + 
-                 traderatio:issuesalience + joint_demo + contbinary + 
-                 powerratio + defense1 + defense2 + tt(issuesalience) + tt(contbinary),
+  fit <- coxph(Surv(tstart, tstop, quit) ~ traderatio + issuesalience1 +issuesalience2 + 
+                 traderatio:issuesalience1 +traderatio:issuesalience2 + joint_demo + contbinary + 
+                 powerratio + defense1 + defense2 + tt(issuesalience2) +tt(tradeissuesalience2)+ tt(contbinary),
                data=tdData1, tt=function(x, t, ...) {x*log(t+lam[i])})
   logL[i] <- logLik(fit)
   aic[i] <- AIC(fit)
@@ -168,9 +172,9 @@ plot(lam, bic, type='l', bty='n', las=1, lwd=2,
 mtext('Log likelihood', 2, line=4)
 ## now use the best lam to refit the model
 lamhat <- lam[which.min(bic)]
-best_fit <- coxph(Surv(tstart, tstop, quit) ~ traderatio + issuesalience + 
-                    traderatio:issuesalience + joint_demo + lossratio + contbinary + 
-                    powerratio + tt(issuesalience) + tt(tradeissuesalience),
+best_fit <- coxph(Surv(tstart, tstop, quit) ~ traderatio + issuesalience1 +issuesalience2 + 
+                    traderatio:issuesalience1 +traderatio:issuesalience2 + joint_demo + contbinary + 
+                    powerratio + defense1 + defense2 + tt(issuesalience2) +tt(tradeissuesalience2)+ tt(contbinary),
                   data=tdData1,tt=function(x, t, ...) {x*log(t+lamhat)})
 
 ## Now Plot the first difference (percentage change in hazard rate) as
@@ -178,11 +182,11 @@ best_fit <- coxph(Surv(tstart, tstop, quit) ~ traderatio + issuesalience +
 ## A 1OO percent increase of trade ratio can be unrealistic
 ## hence, use 1 percent
 par_traderatio <- summary(best_fit)$coefficients["traderatio",c(1,3)]
-par_tradeissuesalience <- summary(best_fit)$coefficients["traderatio:issuesalience",c(1,3)]
-par_ttradeissuesalience <- summary(best_fit)$coefficients["tt(tradeissuesalience)",c(1,3)]
+par_tradeissuesalience2 <- summary(best_fit)$coefficients["traderatio:issuesalience2",c(1,3)]
+par_ttradeissuesalience2 <- summary(best_fit)$coefficients["tt(tradeissuesalience2)",c(1,3)]
 #first difference function from Licht2011
-hrtrade_issuesalienced <- function(x, par1, par2, par3) (exp(0.01*(par1+par2+par3*x))-1)*100
-hrtrade_unissuesalienced <- function(x, par1, par2, par3) (exp(0.01*(par1+par2*0+par3*x*0))-1)*100
+hrtrade_issuesalience2 <- function(x, par1, par2, par3) (exp(0.01*(par1+par2+par3*x))-1)*100
+hrtrade_issuesalience0 <- function(x, par1, par2, par3) (exp(0.01*(par1+par2*0+par3*x*0))-1)*100
 t <- seq(0,999, length=1000) # time length by day
 sim <- 100 # number of simulation
 set.seed(11) 
@@ -192,9 +196,9 @@ for (i in 1:length(t)){
   impact = numeric()
   for (j in 1:sim) {
     par1 = rnorm(1, mean=par_traderatio[1], sd=par_traderatio[2])
-    par2 = rnorm(1, mean=par_tradeissuesalience[1], sd=par_tradeissuesalience[2])
-    par3 = rnorm(1, mean=par_ttradeissuesalience[1], sd=par_ttradeissuesalience[2])
-    impact[j] = hrtrade_issuesalienced(x, par1, par2, par3)
+    par2 = rnorm(1, mean=par_tradeissuesalience2[1], sd=par_tradeissuesalience2[2])
+    par3 = rnorm(1, mean=par_ttradeissuesalience2[1], sd=par_ttradeissuesalience2[2])
+    impact[j] = hrtrade_issuesalience2(x, par1, par2, par3)
   }
   temp = data.frame (time=x, firstdiff=impact)
   plot_dat = rbind(plot_dat, temp)
@@ -206,11 +210,11 @@ tradeimpactplot <- ggplot(plot_dat, aes(time, firstdiff))+
   xlab("Days")+ylab(expression('%'~ Delta ~"in Hazard Rate"))+
   theme_bw() + theme(panel.border = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"))
 
-## Zoom in plot and incorporate the impact of unissuesalienced type 
+## Zoom in plot and incorporate the impact of issuesalience0 type 
 zoominplot <- tradeimpactplot+xlim(0,200)+
-  geom_hline(linetype=2,yintercept=hrtrade_unissuesalienced(0,par_traderatio[1],par_tradeissuesalience[1],par_ttradeissuesalience[1]))+
-  annotate("text", 100, hrtrade_unissuesalienced(0,par_traderatio[1],par_tradeissuesalience[1],par_ttradeissuesalience[1]), vjust = -1, label = "Unissuesalienced Impact: 0.16")+
-  annotate("text",100,-50,label="issuesalienced")
+  geom_hline(linetype=2,yintercept=hrtrade_issuesalience0(0,par_traderatio[1],par_tradeissuesalience2[1],par_ttradeissuesalience2[1]))+
+  annotate("text", 100, hrtrade_issuesalience0(0,par_traderatio[1],par_tradeissuesalience2[1],par_ttradeissuesalience2[1]), vjust = -1, label = "Low Salience: 0.04")+
+  annotate("text",100,-50,label="High Salience")
 ## come back to Licht2011 when writing about interpretation
 
 #########################
