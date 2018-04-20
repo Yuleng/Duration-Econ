@@ -1,6 +1,6 @@
 ## This is the Rcode for testing the duration paper
-## Note 2018 Deadline March
-## Rethink the data first
+## Note that the data on Github has not been updated automatically
+## since I only save data on my local files
 
 setwd("E:/OneDrive2nd/OneDrive - 广厚设计学校/GIT/Duration-Econ")
 library(survival)

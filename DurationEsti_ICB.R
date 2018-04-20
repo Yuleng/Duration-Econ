@@ -1,5 +1,7 @@
 ## This is the Rcode for testing the duration paper
 ## Using ICB data
+## Note that the data on Github has not been updated automatically
+## since I only save data on my local files
 
 setwd("E:/OneDrive2nd/OneDrive - 广厚设计学校/GIT/Duration-Econ")
 library(survival)
@@ -49,7 +51,7 @@ multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
 }
 
 ## load time dependent covariates data
-oad("DurationTimeCov_ICB.RData")
+load("DurationTimeCov_ICB.RData")
 tdData <- durB # change to durG for robustness check
 
 tdData$joint_demo <- ifelse(tdData$demo1>5 & tdData$demo2>5, 1, 0)
@@ -57,6 +59,7 @@ tdData$traderatio <- tdData$tradeshare1/(tdData$tradeshare2+1)
 ## need to think more about viol and salience
 ## because viol may affect termination
 tdData$issuesalience <- factor(ifelse(tdData$gravty==6,2,ifelse(tdData$gravty==3,1,0)), levels=c(0,1,2))
+## instead of factor; maybe transform into binary with three variables can be better
 tdData$traderatio.net <- tdData$tradeshare1.net/(tdData$tradeshare2.net+1)
 
 ## km plot
@@ -72,7 +75,7 @@ ggsurvplot(km_fit, palette="grey",legend="none")
 ## First, fit the model with coxph, jump to the second step as the plots are misguiding and meaningless
 ## if ph is violated
 #########################################
-fit1 <- coxph(Surv(tstart, tstop, quit) ~ traderatio+issuesalience+traderatio:issuesalience+joint_demo+contbinary+powerratio, data=tdData);summary(fit1)
+fit1 <- coxph(Surv(tstart, tstop, quit) ~ traderatio+issuesalience+traderatio:issuesalience+joint_demo+contbinary+powerratio+defense1+defense2, data=tdData);summary(fit1)
 ###################
 ## Plot the impact of traderatio
 temp <- as.data.frame(model.matrix(fit1))
@@ -110,7 +113,7 @@ ggadjustedcurves(fit1, data = newdt3, fun = "pct", method="average",
 
 test.ph <- cox.zph(fit1,transform='rank')#given the proportion of censoring
 ## I need to use time transform rank or km suggested by Park2015
-test.ph
+test.ph ## note, also try km to see if results change much
 ## graph the level of censoring
 # naive way because missing data are ignored
 cen_plot1 <- ggplot(as.data.frame(table(tdData$cens)),aes(x=Var1,y=Freq))+
@@ -143,13 +146,13 @@ ggcoxzph(test.ph, ylim=c(-2,2), point.col="grey")[2]
 ## select the best fit
 ## using log likelihood
 tdData1 <- tdData
-tdData1$tradeissuesalience <- tdData1$traderatio*tdData1$issuesalience #create the interaction term for tt function
+#tdData1$tradeissuesalience <- tdData1$traderatio*tdData1$issuesalience #create the interaction term for tt function
 lam <- seq(0, 99, len=100)
 logL <- aic <- bic <- numeric(length(lam))
 for (i in 1:length(lam)) {
   fit <- coxph(Surv(tstart, tstop, quit) ~ traderatio + issuesalience + 
-                 traderatio:issuesalience + joint_demo + lossratio + contbinary + 
-                 powerratio + tt(issuesalience) + tt(tradeissuesalience),
+                 traderatio:issuesalience + joint_demo + contbinary + 
+                 powerratio + defense1 + defense2 + tt(issuesalience) + tt(contbinary),
                data=tdData1, tt=function(x, t, ...) {x*log(t+lam[i])})
   logL[i] <- logLik(fit)
   aic[i] <- AIC(fit)

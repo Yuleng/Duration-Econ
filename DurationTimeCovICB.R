@@ -18,7 +18,7 @@ icbdy <- merge(icb, subset(icb2,select=-cracid), by=c("crisno","statea"), all.x=
 icbdy <- na.omit(icbdy)
 ## consult the icb dataviewer
 ## http://www.icb.umd.edu/dataviewer/?crisno=1
-## decide if it is agreement and compliance, it counts as quitting
+## decide if it is voluntary agreement or tacit understanding (1,2,3) and compliance (7), it counts as quitting
 ## rest as censored
 icbdy$cens <- ifelse(icbdy$outfor %in% c(1,2,3,7), 1, 0)# censor as 0
 icbdy$ccode1 <- icbdy$statea; icbdy$ccode2 <- icbdy$stateb
@@ -66,6 +66,16 @@ hold$defense1[is.na(hold$defense1)] <- 0
 hold$defense2[is.na(hold$defense2)] <- 0 
 hold$defense1 <- hold$defense1-hold$defense
 hold$defense2 <- hold$defense2-hold$defense
+## four -1 values for defense2
+## three of them concerns Turkey and Cyprus (Treaty of Alliance (1960),concerning the independence of Cyprus from UK )
+## the correlates of war dataset code the dyad inconsistently
+## Turkey-Cyprus coded as 1 defense pack; yet Cyprus-Turkey as 0 defense pack
+## For my purpose, this outside defense pack can be coded as 0 (for Cyprus)
+## the last case concerns Russia and Lithuania 1939
+## again, due to inconsistent coding
+## Russian-L has 1 defense pack; yet L-R has 0 defense pack
+## again, code the latter as 0 
+hold$defense2[hold$defense2==-1] <- 0
 
 
 #######################
@@ -90,7 +100,7 @@ hold <- merge(hold, cinc[,c("ccode2","year","cinc2")], by=c("ccode2","year"), al
 
 library(plyr)
 ## curate the data a bit: calculate powerratio
-hold$powerratio <- log(hold$cinc1/hold$cinc2+1)
+hold$powerratio <- log(hold$cinc1/hold$cinc2+hold$ccode1)
 
 ## major power status
 library(countrycode)
