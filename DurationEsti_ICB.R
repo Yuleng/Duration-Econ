@@ -55,6 +55,7 @@ tdData <- durB # change to durG for robustness check
 tdData$joint_demo <- ifelse(tdData$demo1>5 & tdData$demo2>5, 1, 0)
 tdData$traderatio <- tdData$tradeshare1/(tdData$tradeshare2+1)
 ## need to think more about viol and salience
+## because viol may affect termination
 tdData$issuesalience <- factor(ifelse(tdData$gravty==6,2,ifelse(tdData$gravty==3,1,0)), levels=c(0,1,2))
 tdData$traderatio.net <- tdData$tradeshare1.net/(tdData$tradeshare2.net+1)
 
