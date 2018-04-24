@@ -54,10 +54,10 @@ load("DurationTimeCov_v2.RData")
 tdData <- durB # change to durG for robustness check
 
 tdData$joint_demo <- ifelse(tdData$demo1>5 & tdData$demo2>5, 1, 0)
-tdData$lossratio <- tdData$trooploss1/(tdData$trooploss2+1)
-#tdData$defense <- tdData$defense1/(tdData$defense2+2) ##defense 2 has 23 -1 values, figure it out later
-tdData$traderatio <- tdData$tradeshare1/(tdData$tradeshare2+1)
+#tdData$lossratio <- tdData$trooploss1/(tdData$trooploss2+1)
+tdData$traderatio <- tdData$tradeshare1/(tdData$tradeshare2+tdData$tradeshare1)
 tdData$resolve <- ifelse(tdData$revtype11==1,1,0)
+tdData$defenseratio <- tdData$defense1/(tdData$defense1+tdData$defense2)
 
 ## km plot
 km_fit <- survfit(Surv(tstart,tstop, quit) ~ 1, data=tdData)
@@ -73,6 +73,9 @@ ggsurvplot(km_fit, palette="grey",legend="none")
 ## if ph is violated
 #########################################
 fit1 <- coxph(Surv(tstart, tstop, quit) ~ traderatio+resolve+traderatio:resolve+joint_demo+lossratio+contbinary+powerratio, data=tdData);summary(fit1)
+#########################################
+fit1b <- coxph(Surv(tstart, tstop, quit) ~ traderatio+resolve+traderatio:resolve+joint_demo+contbinary+powerratio+defenseratio, data=tdData);summary(fit1b)
+
 ###################
 ## Plot the impact of traderatio
 temp <- as.data.frame(model.matrix(fit1))
@@ -148,8 +151,8 @@ lam <- seq(0, 99, len=100)
 logL <- aic <- bic <- numeric(length(lam))
 for (i in 1:length(lam)) {
   fit <- coxph(Surv(tstart, tstop, quit) ~ traderatio + resolve + 
-                 traderatio:resolve + joint_demo + lossratio + contbinary + 
-                 powerratio + tt(resolve) + tt(traderesolve),
+                 traderatio:resolve + joint_demo  + contbinary + 
+                 powerratio + defenseratio+ tt(resolve) + tt(traderesolve),
                data=tdData1, tt=function(x, t, ...) {x*log(t+lam[i])})
   logL[i] <- logLik(fit)
   aic[i] <- AIC(fit)
@@ -166,8 +169,8 @@ mtext('Log likelihood', 2, line=4)
 ## now use the best lam to refit the model
 lamhat <- lam[which.min(bic)]
 best_fit <- coxph(Surv(tstart, tstop, quit) ~ traderatio + resolve + 
-               traderatio:resolve + joint_demo + lossratio + contbinary + 
-               powerratio + tt(resolve) + tt(traderesolve),
+                  traderatio:resolve + joint_demo  + contbinary + 
+                  powerratio + defenseratio+ tt(resolve) + tt(traderesolve),
              data=tdData1,tt=function(x, t, ...) {x*log(t+lamhat)})
 
 ## Now Plot the first difference (percentage change in hazard rate) as
@@ -198,7 +201,7 @@ for (i in 1:length(t)){
 }
 ## Plot the impact of trade ratio
 tradeimpactplot <- ggplot(plot_dat, aes(time, firstdiff))+
-                    geom_point(colour="grey",alpha=0.05)+
+                    geom_point(colour="grey",alpha=0.01)+
                     geom_smooth(colour="black")+ylim(-100,20) +
                     xlab("Days")+ylab("Percentage Change in Hazard Rate")+
                     theme_bw() + theme(panel.border = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"))

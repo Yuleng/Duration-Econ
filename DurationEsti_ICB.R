@@ -55,15 +55,19 @@ load("DurationTimeCov_ICB.RData")
 tdData <- durB # change to durG for robustness check
 
 tdData$joint_demo <- ifelse(tdData$demo1>5 & tdData$demo2>5, 1, 0)
-tdData$traderatio <- tdData$tradeshare1/(tdData$tradeshare2+1) ## not like power ratio, because the latter produce too many NA values
+tdData$traderatio <- tdData$tradeshare1/(tdData$tradeshare2+tdData$tradeshare1) ## not like power ratio, because the latter produce too many NA values
 ## need to think more about viol and salience
 ## because viol may affect termination
-tdData$issuesalience <- factor(ifelse(tdData$gravty==6,2,ifelse(tdData$gravty==3,1,0)), levels=c(0,1,2))
+
+## Note 4/23/2018
+## the choice of gravity matters a lot; think more about justification
+tdData$issuesalience <- factor(ifelse(tdData$gravty %in% c(5,6),2,ifelse(tdData$gravty %in% c(2,3,4),1,0)), levels=c(0,1,2))
 temp <- sapply(levels(tdData$issuesalience), function(x) as.integer(x == tdData$issuesalience))
 colnames(temp) <- paste0("issuesalience",colnames(temp))
 tdData <- cbind(tdData,temp)
 ## instead of factor; maybe transform into binary with three variables can be better
 tdData$traderatio.net <- tdData$tradeshare1.net/(tdData$tradeshare2.net+1)
+tdData$defenseratio <- tdData$defense1/(tdData$defense1+tdData$defense2)
 
 ## km plot
 km_fit <- survfit(Surv(tstart,tstop, quit) ~ 1, data=tdData)
@@ -79,7 +83,7 @@ ggsurvplot(km_fit, palette="grey",legend="none")
 ## if ph is violated
 #########################################
 fit1 <- coxph(Surv(tstart, tstop, quit) ~ traderatio+issuesalience+traderatio:issuesalience+joint_demo+contbinary+powerratio+defense1+defense2, data=tdData);summary(fit1)
-fit1b <- coxph(Surv(tstart, tstop, quit) ~ traderatio+issuesalience1+issuesalience2+traderatio:issuesalience1+traderatio:issuesalience2+joint_demo+contbinary+powerratio+defense1+defense2, data=tdData);summary(fit1b)
+fit1b <- coxph(Surv(tstart, tstop, quit) ~ traderatio+issuesalience1+issuesalience2+traderatio:issuesalience1+traderatio:issuesalience2+joint_demo+contbinary+powerratio+defenseratio, data=tdData);summary(fit1b)
 ###################
 ## Plot the impact of traderatio
 temp <- as.data.frame(model.matrix(fit1))
@@ -137,8 +141,9 @@ ggcoxzph(cox.zph(fit1,transform='identity'), point.col="grey")[2] #Showcase the 
 ## graph using rank transformation
 ggcoxzph(test.ph, point.col="grey")[2]
 ## zoom in shows the relation clearer
-ggcoxzph(test.ph, ylim=c(-2,2), point.col="grey")[2]
-
+p1 <- ggcoxzph(test.ph, ylim=c(-4,4), xlab=FALSE, ylab=FALSE, point.col="grey")[2]
+p2 <- ggcoxzph(test.ph, ylim=c(-4,4), xlab=FALSE, ylab=FALSE, point.col="grey")[3]
+multiplot(p1, p2, cols=2)
 ## an alternative way to plot
 ## plot(test.ph[2], ylim=c(-2,2))
 ## abline(h=0,col=2)
@@ -150,13 +155,13 @@ ggcoxzph(test.ph, ylim=c(-2,2), point.col="grey")[2]
 ## select the best fit
 ## using log likelihood
 tdData1 <- tdData
+tdData1$tradeissuesalience1 <- tdData1$traderatio*tdData1$issuesalience1 #create the interaction term for tt function
 tdData1$tradeissuesalience2 <- tdData1$traderatio*tdData1$issuesalience2 #create the interaction term for tt function
 lam <- seq(0, 99, len=100)
 logL <- aic <- bic <- numeric(length(lam))
 for (i in 1:length(lam)) {
-  fit <- coxph(Surv(tstart, tstop, quit) ~ traderatio + issuesalience1 +issuesalience2 + 
-                 traderatio:issuesalience1 +traderatio:issuesalience2 + joint_demo + contbinary + 
-                 powerratio + defense1 + defense2 + tt(issuesalience2) +tt(tradeissuesalience2)+ tt(contbinary),
+  fit <- coxph(update.formula(fit1b, ~. + tt(issuesalience1) +tt(tradeissuesalience1)
+               + tt(issuesalience2) +tt(tradeissuesalience2)+ tt(contbinary)),
                data=tdData1, tt=function(x, t, ...) {x*log(t+lam[i])})
   logL[i] <- logLik(fit)
   aic[i] <- AIC(fit)
@@ -172,20 +177,34 @@ plot(lam, bic, type='l', bty='n', las=1, lwd=2,
 mtext('Log likelihood', 2, line=4)
 ## now use the best lam to refit the model
 lamhat <- lam[which.min(bic)]
-best_fit <- coxph(Surv(tstart, tstop, quit) ~ traderatio + issuesalience1 +issuesalience2 + 
-                    traderatio:issuesalience1 +traderatio:issuesalience2 + joint_demo + contbinary + 
-                    powerratio + defense1 + defense2 + tt(issuesalience2) +tt(tradeissuesalience2)+ tt(contbinary),
+best_fit <- coxph(update.formula(fit1b, ~. + tt(issuesalience1) +tt(tradeissuesalience1)
+                 + tt(issuesalience2) +tt(tradeissuesalience2)+ tt(contbinary)),
                   data=tdData1,tt=function(x, t, ...) {x*log(t+lamhat)})
+cox.zph(best_fit,transform='rank')
+stargazer(best_fit, fit1b, 
+          title="Regression Results", align=TRUE, dep.var.labels=c("Corrected Cox Model","Original Cox Model"), 
+          covariate.labels=c("Cost Ratio","Median Salience", "High Salience",
+                             "Joint Democracy","Contiguity","Power Ratio",
+                             "Defense Ratio", "tt(Median Salience)",
+                             "tt(Cost Ratio*Median Salience)", "tt(High Salience)",
+                             "tt(Cost Ratio*High Salience)", "tt(Contiguity)",
+                             "Cost Ratio*Median Salience", "Cost Ratio*High Salience"), 
+          keep.stat=c("ll", "rsq", "n"), no.space=TRUE,
+          add.lines=list(c("BIC", round(BIC(best_fit),1), round(BIC(fit1b),1))))
+
 
 ## Now Plot the first difference (percentage change in hazard rate) as
 ## suggested by Licht_2011 and by Box-Steffensmeier and Jones (2004, 60)
 ## A 1OO percent increase of trade ratio can be unrealistic
 ## hence, use 1 percent
 par_traderatio <- summary(best_fit)$coefficients["traderatio",c(1,3)]
+par_tradeissuesalience1 <- summary(best_fit)$coefficients["traderatio:issuesalience1",c(1,3)]
+par_ttradeissuesalience1 <- summary(best_fit)$coefficients["tt(tradeissuesalience1)",c(1,3)]
 par_tradeissuesalience2 <- summary(best_fit)$coefficients["traderatio:issuesalience2",c(1,3)]
 par_ttradeissuesalience2 <- summary(best_fit)$coefficients["tt(tradeissuesalience2)",c(1,3)]
 #first difference function from Licht2011
 hrtrade_issuesalience2 <- function(x, par1, par2, par3) (exp(0.01*(par1+par2+par3*x))-1)*100
+hrtrade_issuesalience1 <- function(x, par1, par2, par3) (exp(0.01*(par1+par2+par3*x))-1)*100
 hrtrade_issuesalience0 <- function(x, par1, par2, par3) (exp(0.01*(par1+par2*0+par3*x*0))-1)*100
 t <- seq(0,999, length=1000) # time length by day
 sim <- 100 # number of simulation
@@ -193,32 +212,39 @@ set.seed(11)
 plot_dat <- data.frame()
 for (i in 1:length(t)){
   x = t[i]
-  impact = numeric()
+  impact1=impac2=numeric()
   for (j in 1:sim) {
     par1 = rnorm(1, mean=par_traderatio[1], sd=par_traderatio[2])
-    par2 = rnorm(1, mean=par_tradeissuesalience2[1], sd=par_tradeissuesalience2[2])
-    par3 = rnorm(1, mean=par_ttradeissuesalience2[1], sd=par_ttradeissuesalience2[2])
-    impact[j] = hrtrade_issuesalience2(x, par1, par2, par3)
+    par12 = rnorm(1, mean=par_tradeissuesalience1[1], sd=par_tradeissuesalience1[2])
+    par13 = rnorm(1, mean=par_ttradeissuesalience1[1], sd=par_ttradeissuesalience1[2])
+    par22 = rnorm(1, mean=par_tradeissuesalience2[1], sd=par_tradeissuesalience2[2])
+    par23 = rnorm(1, mean=par_ttradeissuesalience2[1], sd=par_ttradeissuesalience2[2])
+    impact2= hrtrade_issuesalience2(x, par1, par22, par23)
+    impact1 = hrtrade_issuesalience1(x, par1, par12, par13)
   }
-  temp = data.frame (time=x, firstdiff=impact)
+  temp = data.frame (time=x, firstdiff1=impact1, firstdiff2=impact2)
   plot_dat = rbind(plot_dat, temp)
 }
+plot_dat = reshape(plot_dat, varying=c("firstdiff1","firstdiff2"), v.names="impact", timevar="type",times=c("firstdiff1","firstdiff2"), direction="long", new.row.names = NULL)
 ## Plot the impact of trade ratio
-tradeimpactplot <- ggplot(plot_dat, aes(time, firstdiff))+
+tradeimpactplot <- ggplot(plot_dat, aes(time, impact, group=type))+
   geom_point(colour="grey",alpha=0.05)+
-  geom_smooth(colour="black")+ylim(-100,20) +
-  xlab("Days")+ylab(expression('%'~ Delta ~"in Hazard Rate"))+
+  geom_smooth(colour="black")+ylim(-100,10) +
+  xlab("Days")+ylab(expression("Hazard Rate"))+
   theme_bw() + theme(panel.border = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"))
 
 ## Zoom in plot and incorporate the impact of issuesalience0 type 
-zoominplot <- tradeimpactplot+xlim(0,200)+
+zoominplot <- tradeimpactplot+
   geom_hline(linetype=2,yintercept=hrtrade_issuesalience0(0,par_traderatio[1],par_tradeissuesalience2[1],par_ttradeissuesalience2[1]))+
-  annotate("text", 100, hrtrade_issuesalience0(0,par_traderatio[1],par_tradeissuesalience2[1],par_ttradeissuesalience2[1]), vjust = -1, label = "Low Salience: 0.04")+
-  annotate("text",100,-50,label="High Salience")
+  annotate("text", 500, hrtrade_issuesalience0(0,par_traderatio[1],par_tradeissuesalience2[1],par_ttradeissuesalience2[1]), vjust = -1, label = paste("Low Salience:",round(hrtrade_issuesalience0(0,par_traderatio[1],par_tradeissuesalience2[1],par_ttradeissuesalience2[1]),digits=2)))+
+  annotate("text",400,-40,label="Median Salience")+
+  annotate("text",100,-75,label="High Salience")
+
 ## come back to Licht2011 when writing about interpretation
 
+
 #########################
-## Finally, Hazard Rate change sign
+## Finally, if Hazard Rate change sign
 ## According to Ruhe2018 should plot survival rate
 #########################
 ## tt function cannot handle prediction now

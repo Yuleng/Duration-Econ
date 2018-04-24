@@ -6,7 +6,7 @@ library(survival)
 library(countrycode)
 ## read icb data from icb 1918-2015
 icb <- read.csv("./DATA/icb/icbdy_v12.csv")[,c("crisno","year","statea","stateb")]
-icb2 <- read.csv("./DATA/icb/icb2v12.csv")[,c("crisno","cracid","trgterra","resterra","outfor","viol","issue","gravty")]
+icb2 <- read.csv("./DATA/icb/icb2v12.csv")[,c("crisno","cracid","trgterra","resterra","outfor","viol","issue","gravty","chissu")]
 icb2$statea <- icb2$cracid
 ## I choose gravity over issue because the former varies within a dyad, the latter does no
 ## use crisno 445 Russian-Georgia to illustrate
@@ -29,7 +29,7 @@ icbdy$cens <- ifelse(icbdy$outfor %in% c(1,2,3,7), 1, 0)# censor as 0
 icbdy$ccode1 <- icbdy$statea; icbdy$ccode2 <- icbdy$stateb
 
 ## create the basic frame for duration data
-dur <- icbdy[,c("ccode1","ccode2","year","trgterra","resterra","cens","viol","gravty","crisno")]
+dur <- icbdy[,c("ccode1","ccode2","year","trgterra","resterra","cens","viol","gravty","crisno","chissu")]
 dur$id <- 1:length(dur$crisno)
 
 ## creating a dataset to hold covariates from the duration dataset
@@ -170,7 +170,7 @@ holdG$tradeshare2.net <- holdG$tradeshare2*exp(-holdG$integration2)
 
 ## now assemble the data into having time varying covariates
 dur$dur <- dur$trgterra; dur0<-dur
-dur <- dur[,c("id","dur","cens","crisno","gravty","viol")] 
+dur <- dur[,c("id","dur","cens","crisno","gravty","viol","chissu")] 
 dur <- tmerge(dur, dur, id=id, quit=event(dur,cens)) # set the range
 durB <- tmerge(dur, holdB, id=id, 
                tradedepend1=tdc(day,tradedepend1), tradedepend2=tdc(day,tradedepend2),
