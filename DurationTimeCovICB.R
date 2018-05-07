@@ -105,7 +105,7 @@ hold <- merge(hold, cinc[,c("ccode2","year","cinc2")], by=c("ccode2","year"), al
 
 library(plyr)
 ## curate the data a bit: calculate powerratio
-hold$powerratio <- log(hold$cinc1/hold$cinc2+hold$ccode1)
+hold$powerratio <- log(hold$cinc1/hold$cinc2+hold$cinc1)
 
 ## major power status
 library(countrycode)
@@ -197,4 +197,5 @@ durG <- tmerge(dur, holdG, id=id,
 
 ## save the data
 save(durB,durG, file="./GIT/Duration-Econ/DurationTimeCov_ICB.RData")
+save(durB,durG, file="C:/Users/YULENG/Documents/Duration-Econ/Duration-Econ/DurationTimeCov_ICB.RData")
 

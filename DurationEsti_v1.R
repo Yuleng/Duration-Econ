@@ -245,7 +245,8 @@ dat_fun <- function (tstart, tstop, traderatio, resolve=1, joint_demo=0, lossrat
                     resolve=resolve, traderesolve=rep(traderatio,each=len)*resolve,
                     joint_demo=joint_demo, lossratio=lossratio, contbinary=contbinary, powerratio=powerratio,
                     tresolve=log(rep(tstop,2))*resolve,
-                    ttraderesolve=as.vector(outer(log(tstop),traderatio))*resolve)
+                    ttraderesolve=as.vector(outer(log(tstop),traderatio))*resolve,
+                    dispnum3=1353)
   return(temp)
 }
 end <- 200; step <- 1

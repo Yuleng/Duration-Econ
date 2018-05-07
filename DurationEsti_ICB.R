@@ -58,7 +58,6 @@ tdData$joint_demo <- ifelse(tdData$demo1>5 & tdData$demo2>5, 1, 0)
 tdData$traderatio <- tdData$tradeshare1/(tdData$tradeshare2+tdData$tradeshare1) ## not like power ratio, because the latter produce too many NA values
 ## need to think more about viol and salience
 ## because viol may affect termination
-
 ## Note 4/23/2018
 ## the choice of gravity matters a lot; think more about justification
 tdData$issuesalience <- factor(ifelse(tdData$gravty %in% c(5,6),2,ifelse(tdData$gravty %in% c(2,3,4),1,0)), levels=c(0,1,2))
@@ -66,7 +65,7 @@ temp <- sapply(levels(tdData$issuesalience), function(x) as.integer(x == tdData$
 colnames(temp) <- paste0("issuesalience",colnames(temp))
 tdData <- cbind(tdData,temp)
 ## instead of factor; maybe transform into binary with three variables can be better
-tdData$traderatio.net <- tdData$tradeshare1.net/(tdData$tradeshare2.net+1)
+tdData$traderatio.net <- tdData$tradeshare1.net/(tdData$tradeshare2.net+tdData$tradeshare1.net)
 tdData$defenseratio <- tdData$defense1/(tdData$defense1+tdData$defense2)
 
 ## km plot
@@ -250,16 +249,23 @@ zoominplot <- tradeimpactplot+
 ## tt function cannot handle prediction now
 ## second best choice interaction with time
 ## now there seems to be different takes on interacting with start or stop time
-## John Fox interact it with stop time
+## People seem to disagree on time interaction
+## here it is interacted with start time
+## https://www.r-bloggers.com/dealing-with-non-proportional-hazards-in-r/
+## fox interacted with stop time
+## https://socserv.socsci.mcmaster.ca/jfox/Books/Companion/appendix/Appendix-Cox-Regression.pdf
 ## which appears to be close to the best fit model
 tdData2 <- tdData1
 #tdData2$traderatio <- tdData2$traderatio+0.0001 #add this to exclude 0 so that my plots to get around tt function can work
 tdData2$time <- tdData2$tstop
-tdData2$tissuesalience <- tdData2$issuesalience*log(tdData1$tstop)
-tdData2$ttradeissuesalience <- tdData2$tradeissuesalience*log(tdData1$tstop)
-secondbest_fit <- coxph(Surv(tstart, tstop, quit) ~ traderatio + issuesalience + 
-                          tradeissuesalience + joint_demo + lossratio + contbinary + 
-                          powerratio + tissuesalience+ttradeissuesalience,
+tdData2$tissuesalience1 <- tdData2$issuesalience1*log(tdData2$tstop)
+tdData2$ttradeissuesalience1 <- tdData2$tradeissuesalience1*log(tdData2$tstop)
+tdData2$tissuesalience2 <- tdData2$issuesalience2*log(tdData2$tstop)
+tdData2$ttradeissuesalience2 <- tdData2$tradeissuesalience2*log(tdData2$tstop)
+tdData2$tcontbinary <- tdData2$contbinary*log(tdData2$tstop)
+secondbest_fit <- coxph(update.formula(fit1b, ~. +tcontbinary
+                        + tissuesalience1+ttradeissuesalience1
+                        + tissuesalience2+ttradeissuesalience2),
                         data=tdData2); summary(secondbest_fit)
 ## check the difference
 ## summary(best_fit)$coefficients[,1];summary(secondbest_fit)$coefficients[,1]
@@ -287,160 +293,3 @@ temp <- dat_fun(t1,t2,traderatio,issuesalience=1,lossratio=0.1)
 
 ggadjustedcurves(secondbest_fit,data=temp,variable="traderatio",method="average")
 
-###############################################################
-## The parts below can be deleted
-#########################################################
-## People seem to disagree on time interaction
-## here it is interacted with start time
-## https://www.r-bloggers.com/dealing-with-non-proportional-hazards-in-r/
-## fox interacted with stop time
-## https://socserv.socsci.mcmaster.ca/jfox/Books/Companion/appendix/Appendix-Cox-Regression.pdf
-## Therneau urged the use of tt function
-## because interacting with time breaks the rule of
-## not looking into the future
-## in the document for survival package p20
-tdData1 <- tdData; tdData1$traderatio <- tdData1$traderatio+0.0001 #add this to exclude 0 so that my plots to get around tt function can work
-tdData1$tradeissuesalience <- tdData1$traderatio*tdData1$issuesalience
-mod1 <- coxph(Surv(tstart, tstop, quit) ~ traderatio+issuesalience+traderatio:issuesalience+joint_demo+lossratio+contbinary+powerratio+
-                tt(issuesalience)+tt(tradeissuesalience),
-              data=tdData1,tt = function(x, t, ...) x * log(t+20));summary(mod1)
-
-## cannot be plotted because survfit cannot process tt terms
-## possible solutions
-## https://stackoverflow.com/questions/31105216/plotting-estimated-hr-from-coxph-object-with-time-dependent-coefficient-and-spli/31316057#31316057
-## https://cran.r-project.org/web/packages/Greg/vignettes/timeSplitter.html
-## my thought: extract the model.matrx then refit the model
-
-## Plot the impact of traderatio
-temp <- as.data.frame(model.matrix(mod1))
-weight <- c(0.1/temp$traderatio, 10/temp$traderatio)
-newdt2 <- rbind(temp,temp)
-newdt2$traderatio <- newdt2$traderatio*weight
-newdt2$`traderatio:issuesalience` <- newdt2$`traderatio:issuesalience`*weight
-newdt2$`tt(tradeissuesalience)` <- newdt2$`tt(tradeissuesalience)`*weight
-names(newdt2)[6:8] <- c("tissuesalience","ttradeissuesalience","tradeissuesalience")
-newdt2 <- cbind(tdData1[ceiling(as.numeric(rownames(temp))),c("tstart","tstop","quit")],newdt2)
-rmod1 <- coxph(Surv(tstart, tstop, quit) ~ traderatio+issuesalience+tradeissuesalience+joint_demo+lossratio+contbinary+
-                 tissuesalience+ttradeissuesalience,
-               data=newdt2);summary(rmod1)
-ggadjustedcurves(mod1, data = newdt2, fun = "pct", method="average",
-                 legend.title="Impact of Trade Ratio", 
-                 variable ="traderatio", ylab="Prob of Surv")
-
-## try these suggested methods
-## https://rviews.rstudio.com/2017/09/25/survival-analysis-with-r/
-cox_fit1 <- survfit(fit1)
-autoplot(cox_fit1)
-
-aa_fit <-aareg(Surv(tstart, tstop, quit) ~ traderatio+issuesalience+joint_demo+lossratio+contbinary+powerratio, data=tdData);summary(fit1)
-autoplot(aa_fit)
-
-
-## run preliminary test
-fit1 <- coxph(Surv(tstart, tstop, quit) ~ tradeshare1+tradeshare2+demo1+demo2+trooploss1+trooploss2+mindist+defense1+defense2+powerratio, data=tdData);summary(fit1)
-fit1 <- coxph(Surv(tstart, tstop, quit) ~ tradeshare1+tradeshare2+joint_demo+lossratio+mindist+defense+powerratio, data=tdData);summary(fit1)
-## mindist can be rerun by conttype, contbinary
-## alliance can be rerun by igo, affinity
-## powerratio can be rerun by major1+major2
-
-## check time dependent coefficient
-cox.zph(fit1) ## indicate demo1 demo2 mindist should have time varying impacts
-
-## plot estimate survival time
-ggsurvplot(survfit(fit1), fun = "pct", ggtheme = theme_minimal())
-
-
-###################
-## Plot the impact of traderatio
-temp <- as.data.frame(model.matrix(fit1))
-## check the distribution of traderatio quantile(temp[,1])
-newdt1 <- cbind(rep(c(0.1,1,2,5,10), each=dim(temp)[1]),
-                rbind(temp[,-1],temp[,-1],temp[,-1],temp[,-1],temp[,-1]))
-names(newdt1) <- names(temp)
-ggadjustedcurves(fit1, data = newdt1, fun = "pct", method="average",
-                 legend.title="Impact of Trade Ratio", 
-                 variable ="traderatio", ylab="Prob of Surv") # add xlim if needed xlim=c(0,quantile(tdData$dur, na.rm=TRUE, probs=.75)),
-
-## a different version
-temp <- as.data.frame(model.matrix(fit1))
-newdt1 <- cbind(rep(c(0.001,0.1,0.3), each=dim(temp)[1]),
-                rbind(temp[,-1],temp[,-1],temp[,-1]))
-names(newdt1) <- names(temp)
-ggcoxadjustedcurves(fit1, data = newdt1, fun = "pct", xlim=c(0,quantile(tdData$dur, na.rm=TRUE, probs=.75)),
-                    legend.title="trade", legend.labs=c("L","M","H"), variable = newdt1[,1])
-
-## add time dep effect by demos
-fit1t <- coxph(Surv(tstart, tstop, quit) ~ tradeshare1+tradeshare2+demo1+demo2+tt(demo1)+tt(demo2)+mindist+alliance+tt(alliance)+powerratio, data=tdData, tt=function(x, t, ...) {x*t});summary(fit1t)
-## check again
-cox.zph(fit1t)
-
-
-
-
-## use stratification instead of interacting with time given I have no interest in demo
-fit1t <- coxph(Surv(tstart, tstop, quit) ~ tradeshare1+tradeshare2+strata(demo1)+strata(demo2)+mindist+alliance+powerratio, data=tdData);summary(fit1t)
-## check again
-cox.zph(fit1t)
-
-## using the suggestion by
-## https://www.r-bloggers.com/dealing-with-non-proportional-hazards-in-r/
-tdData$demo1_time = tdData$demo1*tdData$tstart; tdData$demo2_time = tdData$demo2*tdData$tstart
-tdData$alliance_time = tdData$alliance*tdData$tstart;
-fit2t <- coxph(Surv(tstart, tstop, quit) ~ tradeshare1+tradeshare2+demo1+demo1_time+demo2+demo2_time+mindist+alliance+alliance_time+powerratio, data=tdData);summary(fit2t)
-## check again
-cox.zph(fit2t);dim(model.matrix(fit2t))
-
-
-temp <- as.data.frame(model.matrix(fit2t))
-newdt1 <- cbind(rep(c(0.001,0.1,0.3), each=dim(temp)[1]),
-                rbind(temp[,-1],temp[,-1],temp[,-1]))
-names(newdt1) <- names(temp)
-ggcoxadjustedcurves(fit2t, data = newdt1, fun = "pct", xlim=c(1,quantile(tdData$dur, na.rm=TRUE, probs=.75)),
-                    legend.title="trade", variable = newdt1[,1])
-
-
-ggforest(fit2t)
-ggcoxzph(cox.zph(fit2t))
-ggcoxdiagnostics(fit2t)
-
-
-## testing influential outliers
-outliertest <- ggcoxdiagnostics(fit1, type = "deviance",
-                                linear.predictions = FALSE, ggtheme = theme_bw())
-
-## reestimate ofter deleting outliers deviance greater than 1
-tdDataNoOutlier <- na.omit(tdData[,c(names(tdData)[1:6],colnames(model.matrix(fit1)))])[outliertest$data$res<1,]
-
-fit2 <- coxph(Surv(tstart, tstop, quit) ~ tradeshare1+tradeshare2+demo1+demo2+mindist+alliance+powerratio, data=tdDataNoOutlier);summary(fit2)
-## check again
-cox.zph(fit2)
-
-## testing nonlinearty
-ggcoxfunctional(Surv(tstart, tstop, quit) ~ tradeshare1 + log(tradeshare1) + sqrt(tradeshare1), data = tdData)
-
-###################
-## Plot the impact of tradeshare1
-newdt1 <- as.data.frame(model.matrix(fit1t))
-tradeshare1 <- rep(c(0.00001,0.5), each=dim(newdt1)[1])
-newdt1 <- cbind(tradeshare1, rbind(subset(newdt1,select=-tradeshare1),subset(newdt1,select=-tradeshare1)))
-ggcoxadjustedcurves(fit1t, data = newdt1, fun = "pct", variable = newdt1[,"tradeshare1"])
-
-
-
-
-## Add splines for tradeshare 1 because the model indicates its impacts may vary
-fit1s <- coxph(Surv(tstart, tstop, quit) ~ pspline(tradeshare1)+pspline(tradeshare2)+demo1+demo2+contbinary+alliance+cinc1+cinc2,data=tdData)
-summary(fit1s)
-termplot(fit1s,term=1,se=TRUE, ylim=c(-2.5,0.5)) # se=TRUE
-termplot(fit1s,term=1,se=TRUE, ylim=c(-0.5,1.5))
-
-fit2s <- coxph(Surv(tstart, tstop, quit) ~ pspline(tradeshare1)+tradeshare2+demo1+demo2+contbinary+alliance+cinc1+cinc2,data=na.omit(tdData))
-summary(fit2s)
-termplot(fit2s,term=1,se=TRUE, ylim=c(-10,10))
-
-
-ptemp <- termplot(fit1s, term=1, se=TRUE, plot=F)
-ptemp1 <- ptemp$tradeshare1
-ptemp1 <- ptemp1[ptemp1$x<0.2,]
-h <- ggplot(ptemp1, aes(x=x, y=y))
-h+geom_ribbon(aes(ymin=y-1.96*se,ymax=y+1.96*se),fill="grey70")+geom_line(aes(y=y))
