@@ -307,6 +307,7 @@ summary(best_fitc_main)$coefficients[,c(1,6)]
 
 ###############
 ## Plot the proxy survival rate
+## Using the marginal approach
 ###############
 ## Impact of issuesalience and traderatio
 summary(tdData$traderatio)
