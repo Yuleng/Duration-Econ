@@ -134,6 +134,9 @@ cmod2 <- coxph(update.formula(cmod, ~.+tcontbinary+tissuesalience1+tissuesalienc
                                 traderatio:tissuesalience1+traderatio:tissuesalience2), data=tdData);summary(cmod2)
 cox.zph(cmod2,transform='rank')
 
+fmod2 <- coxph(update.formula(fmod, ~.+tcontbinary+tissuesalience1+tissuesalience2+
+                                traderatio:tissuesalience1+traderatio:tissuesalience2), data=tdData);summary(fmod2)
+
 
 ########################
 ## Hazard Ratio and Survival curve
