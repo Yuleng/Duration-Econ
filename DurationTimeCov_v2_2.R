@@ -159,19 +159,19 @@ hold$major2 <- ifelse((hold$ccode2==2 & hold$year >1897 & hold$year < 2017) |
 
 ## Read trade data
 load("./DATA/TRADE/COW/trade2017.RData")
-load("./DATA/TRADE/tradeNet_constUSd.RData")
+load("./DATA/TRADE/TradeNet_2018.RData")
 
 
 holdB <- merge(hold, tradeB[,c("ccode1","ccode2","year","tradeshare1","tradeshare2","tradedepend1","tradedepend2")],by=c("ccode1","ccode2","year"), all.x=TRUE)
 holdG <- merge(hold, tradeG[,c("ccode1","ccode2","year","tradeshare1","tradeshare2","tradedepend1","tradedepend2")],by=c("ccode1","ccode2","year"), all.x=TRUE)
 rm(tradeB, tradeG) # remove the raw data
 
-trade.closeness.constusd$ccode1 <- trade.closeness.constusd$ccode2 <- trade.closeness.constusd$node
-trade.closeness.constusd$integration1 <- trade.closeness.constusd$integration2 <- trade.closeness.constusd$total
-holdB <- merge(holdB, trade.closeness.constusd[,c("ccode1","year","integration1")],by=c("ccode1","year"), all.x=TRUE)
-holdB <- merge(holdB, trade.closeness.constusd[,c("ccode2","year","integration2")],by=c("ccode2","year"), all.x=TRUE)
-holdG <- merge(holdG, trade.closeness.constusd[,c("ccode1","year","integration1")],by=c("ccode1","year"), all.x=TRUE)
-holdG <- merge(holdG, trade.closeness.constusd[,c("ccode2","year","integration2")],by=c("ccode2","year"), all.x=TRUE)
+trade.closeness2$ccode2 <- trade.closeness2$ccode1
+trade.closeness2$integration1 <- trade.closeness2$integration2 <- trade.closeness2$total
+holdB <- merge(holdB, trade.closeness2[,c("ccode1","year","integration1")],by=c("ccode1","year"), all.x=TRUE)
+holdB <- merge(holdB, trade.closeness2[,c("ccode2","year","integration2")],by=c("ccode2","year"), all.x=TRUE)
+holdG <- merge(holdG, trade.closeness2[,c("ccode1","year","integration1")],by=c("ccode1","year"), all.x=TRUE)
+holdG <- merge(holdG, trade.closeness2[,c("ccode2","year","integration2")],by=c("ccode2","year"), all.x=TRUE)
 
 holdB$tradedepend1.net <- holdB$tradedepend1*exp(-holdB$integration1)
 holdB$tradedepend2.net <- holdB$tradedepend2*exp(-holdB$integration2)

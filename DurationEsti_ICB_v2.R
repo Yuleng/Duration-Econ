@@ -10,6 +10,7 @@ library(dplyr)
 library(ggfortify)
 library(grid)
 library(xtable)
+library(coxme)
 multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
   
   # Make a list from the ... arguments and plotlist
@@ -67,7 +68,7 @@ tdData$tradeissuesalience2 <- tdData$traderatio*tdData$issuesalience2
 
 fit1b <- coxph(Surv(tstart, tstop, quit) ~ traderatio+issuesalience1+issuesalience2+tradeissuesalience1+tradeissuesalience2+joint_demo+contbinary+powerratio+defenseratio, data=tdData);summary(fit1b)
 fit1bc <- coxph(Surv(tstart, tstop, quit) ~ traderatio+issuesalience1+issuesalience2+tradeissuesalience1+tradeissuesalience2+joint_demo+contbinary+powerratio+defenseratio+cluster(crisno), data=tdData);summary(fit1bc)
-fit1bf<- coxph(Surv(tstart, tstop, quit) ~ traderatio+issuesalience1+issuesalience2+tradeissuesalience1+tradeissuesalience2+joint_demo+contbinary+powerratio+defenseratio+frailty(crisno), data=tdData);summary(fit1bf)
+fit1bf<- coxme(Surv(tstart, tstop, quit) ~ traderatio+issuesalience1+issuesalience2+tradeissuesalience1+tradeissuesalience2+joint_demo+contbinary+powerratio+defenseratio+(1|crisno), data=tdData);summary(fit1bf)
 
 test.ph <- cox.zph(fit1b,transform='rank')#given the proportion of censoring
 ## I need to use time transform rank or km suggested by Park2015
@@ -86,7 +87,7 @@ logL <- aic <- bic <- numeric(length(lam))
 for (i in 1:length(lam)) {
   fit <- coxph(update.formula(fit1bc, ~. + tt(issuesalience1) +tt(tradeissuesalience1)
                               + tt(issuesalience2) +tt(tradeissuesalience2)+ tt(contbinary)),
-               data=tdData1, tt=function(x, t, ...) {x*log(t+lam[i])})
+               data=tdData, tt=function(x, t, ...) {x*log(t+lam[i])})
   logL[i] <- logLik(fit)
   aic[i] <- AIC(fit)
   bic[i] <- BIC(fit)
@@ -103,8 +104,8 @@ mtext('Log likelihood', 2, line=4)
 lamhat <- lam[which.min(bic)]
 best_fitc_main <- coxph(update.formula(fit1bc, ~. + tt(issuesalience1) +tt(tradeissuesalience1)
                                   + tt(issuesalience2) +tt(tradeissuesalience2)+ tt(contbinary)),
-                   data=tdData1,tt=function(x, t, ...) {x*log(t+lamhat)})
-summary(best_fitc_main)
+                   data=tdData,tt=function(x, t, ...) {x*log(t+lamhat)})
+summary(best_fitc_main)$coefficients[,c(1,6)]
 
 ##########
 ## First Difference of Trade Ratio
@@ -159,7 +160,7 @@ logL <- aic <- bic <- numeric(length(lam))
 for (i in 1:length(lam)) {
   fit <- coxph(update.formula(fit1bc, ~. +tt(traderatio)+ tt(issuesalience1) +tt(tradeissuesalience1)
                               + tt(issuesalience2) +tt(tradeissuesalience2)+ tt(contbinary)),
-               data=tdData1, tt=function(x, t, ...) {x*log(t+lam[i])})
+               data=tdData, tt=function(x, t, ...) {x*log(t+lam[i])})
   logL[i] <- logLik(fit)
   aic[i] <- AIC(fit)
   bic[i] <- BIC(fit)
@@ -176,8 +177,8 @@ mtext('Log likelihood', 2, line=4)
 lamhat <- lam[which.min(bic)]
 best_fitc <- coxph(update.formula(fit1bc, ~. +tt(traderatio)+ tt(issuesalience1) +tt(tradeissuesalience1)
                                   + tt(issuesalience2) +tt(tradeissuesalience2)+ tt(contbinary)),
-                   data=tdData1,tt=function(x, t, ...) {x*log(t+lamhat)})
-summary(best_fitc)
+                   data=tdData,tt=function(x, t, ...) {x*log(t+lamhat)})
+summary(best_fitc)$coefficients[,c(1,6)]
 
 ##########
 ## First Difference of Trade Ratio
