@@ -105,7 +105,8 @@ hold <- merge(hold, cinc[,c("ccode2","year","cinc2")], by=c("ccode2","year"), al
 
 library(plyr)
 ## curate the data a bit: calculate powerratio
-hold$powerratio <- log(hold$cinc1/hold$cinc2+hold$cinc1)
+## hold$powerratio <- log(hold$cinc1/(hold$cinc2+hold$cinc1))
+hold$powerratio <- log(hold$cinc1/(hold$cinc2+.Machine$double.eps)+1)
 
 ## major power status
 library(countrycode)

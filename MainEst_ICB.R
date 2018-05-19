@@ -98,27 +98,28 @@ tdData <- durB # change to durG for robustness check
 tdData$joint_demo <- ifelse(tdData$demo1>5 & tdData$demo2>5, 1, 0)
 ## contest success function provides probability of winning
 ## cost ratio is closer to what I seek to capture
-tdData$traderatio <- tdData$tradeshare1/(tdData$tradeshare2+.Machine$double.eps) ## not like power ratio, because the latter produce too many NA values
+tdData$traderatio <- tdData$tradeshare1/(tdData$tradeshare2+.Machine$double.eps) 
 tdData$issuesalience <- factor(ifelse(tdData$gravty %in% c(5,6),2,ifelse(tdData$gravty %in% c(2,3,4),1,0)), levels=c(0,1,2))
 temp <- sapply(levels(tdData$issuesalience), function(x) as.integer(x == tdData$issuesalience))
 colnames(temp) <- paste0("issuesalience",colnames(temp))
 tdData <- cbind(tdData,temp)
 tdData$traderatio.net <- tdData$tradeshare1.net/(tdData$tradeshare2.net+.Machine$double.eps)
 tdData$defenseratio <- log(tdData$defense1/(tdData$defense2+.Machine$double.eps)+1)
+## tdData$traderatio <- tdData$traderatio.net
+## tdData$traderatio <- tdData$tradedepend1/(tdData$tradedepend2+.Machine$double.eps)
+## tdData$traderatio.net <- tdData$tradedepend1.net/(tdData$tradedepend2.net+.Machine$double.eps)
 tdData$tradeissuesalience1 <- tdData$traderatio*tdData$issuesalience1
 tdData$tradeissuesalience2 <- tdData$traderatio*tdData$issuesalience2
 file <- paste0("C:/Users/YULENG/OneDrive/Documents/RESEARCH/Manuscript/Duration/ISQ/",
           "TradeshareNet/")#tweak to different files
-## tdData$traderatio <- tdData$tradedepend1/(tdData$tradedepend2+.Machine$double.eps) ## not like power ratio, because the latter produce too many NA values
-## tdData$traderatio.net <- tdData$tradedepend1.net/(tdData$tradedepend2.net+.Machine$double.eps)
 
-## tdData$traderatio <- tdData$traderatio.net
+
 
 ##############
 ## Basic Models and Tests
 ##############
-fit1b <- coxph(Surv(tstart, tstop, quit) ~ traderatio+issuesalience1+issuesalience2+tradeissuesalience1+tradeissuesalience2+joint_demo+contbinary+powerratio+defenseratio, data=tdData);summary(fit1b)
-fit1bc <- coxph(Surv(tstart, tstop, quit) ~ traderatio+issuesalience1+issuesalience2+tradeissuesalience1+tradeissuesalience2+joint_demo+contbinary+powerratio+defenseratio+cluster(crisno), data=tdData);summary(fit1bc)
+fit1b <- coxph(Surv(tstart, tstop, quit) ~ traderatio+issuesalience1+issuesalience2+traderatio:issuesalience1+traderatio:issuesalience2+joint_demo+contbinary+powerratio+defenseratio, data=tdData);summary(fit1b)
+fit1bc <- coxph(Surv(tstart, tstop, quit) ~ traderatio+issuesalience1+issuesalience2+traderatio:issuesalience1+traderatio:issuesalience2+joint_demo+contbinary+powerratio+defenseratio+cluster(crisno), data=tdData);summary(fit1bc)
 fit1bf<- coxph(Surv(tstart, tstop, quit) ~ traderatio+issuesalience1+issuesalience2+tradeissuesalience1+tradeissuesalience2+joint_demo+contbinary+powerratio+defenseratio+frailty(crisno), data=tdData);summary(fit1bf)
 fit1bf_me<- coxme(Surv(tstart, tstop, quit) ~ traderatio+issuesalience1+issuesalience2+tradeissuesalience1+tradeissuesalience2+joint_demo+contbinary+powerratio+defenseratio+(1|crisno), data=tdData);summary(fit1bf_me)
 ## coxme is prefered in frailty model
@@ -167,12 +168,14 @@ print(xtable(phtest_km, type = "latex",digits=4), file = paste0(file,"PHTestKM.t
 ####################
 ## tt without traderatio
 ####################
+clusterform <- update.formula(fit1bc, ~. + tt(issuesalience1) +tt(tradeissuesalience1)+
+                                tt(issuesalience2) +tt(tradeissuesalience2)+ 
+                                tt(contbinary)+tt(powerratio))
+
 lam <- seq(0, 99, len=100)
 logL <- aic <- bic <- numeric(length(lam))
 for (i in 1:length(lam)) {
-  fit <- coxph(update.formula(fit1bc, ~. + tt(issuesalience1) +tt(tradeissuesalience1)
-                              + tt(issuesalience2) +tt(tradeissuesalience2)+ tt(contbinary)+tt(powerratio)),
-               data=tdData, tt=function(x, t, ...) {x*log(t+lam[i])})
+  fit <- coxph(clusterform, data=tdData, tt=function(x, t, ...) {x*log(t+lam[i])})
   logL[i] <- logLik(fit)
   aic[i] <- AIC(fit)
   bic[i] <- BIC(fit)
@@ -187,9 +190,7 @@ plot(lam, bic, type='l', bty='n', las=1, lwd=2,
 mtext('Log likelihood', 2, line=4)
 ## now use the best lam to refit the model
 lamhat <- lamhat_maincluster <- lam[which.min(bic)] 
-best_fitc_main <- coxph(update.formula(fit1bc, ~. + tt(issuesalience1) +tt(tradeissuesalience1)
-                                       + tt(issuesalience2) +tt(tradeissuesalience2)+ tt(contbinary)+tt(powerratio)),
-                        data=tdData,tt=function(x, t, ...) {x*log(t+lamhat)})
+best_fitc_main <- coxph(clusterform, data=tdData,tt=function(x, t, ...) {x*log(t+lamhat)})
 summary(best_fitc_main)$coefficients[,c(1,6)]
 
 ##########
@@ -202,7 +203,8 @@ densityPlot(tdData$traderatio,na.rm=T);
 densityPlot(tdData$traderatio[tdData$traderatio<quantile(tdData$traderatio,.75,na.rm=T)],na.rm=T)
 
 ## proportional of effect
-prop <- quantile(tdData$traderatio,.75,na.rm=T)-quantile(tdData$traderatio,.25,na.rm=T)
+##prop <- quantile(tdData$traderatio,.75,na.rm=T)-quantile(tdData$traderatio,.25,na.rm=T)
+prop <- 100-0.01
 par_traderatio <- summary(best_fitc_main)$coefficients["traderatio",c(1,4)]
 par_tradeissuesalience1 <- summary(best_fitc_main)$coefficients["tradeissuesalience1",c(1,4)]
 par_ttradeissuesalience1 <- summary(best_fitc_main)$coefficients["tt(tradeissuesalience1)",c(1,4)]
@@ -242,9 +244,14 @@ tradeimpactplot_c_main <- ggplot(plot_dat, aes(time, impact, group=type))+
   scale_linetype_manual(values=c("twodash", "dotted","solid"),
                         name="Salience", 
                         labels = c("Low","Median","High"))
-main_fd_c <- tradeimpactplot_c_main+scale_y_continuous(breaks =c(-1,0,1),limits = c(-2,1))
+##main_fd_c <- tradeimpactplot_c_main+scale_y_continuous(breaks =c(-1,0,1),limits = c(-2,1))
+main_fd_c <-tradeimpactplot_c_main+scale_y_continuous(breaks =c(-10,0,10),limits = c(-25,10))
 ggsave(filename=paste0(file,"FDPlot_Main.pdf"),
        plot=main_fd_c)
+
+
+
+
 
 #######################
 ## Include tt for traderatio
@@ -318,7 +325,9 @@ tradeimpactplot_c <- ggplot(plot_dat, aes(time, impact, group=type))+
                         name="Salience", 
                         labels = c("Low","Median","High"))
 
-main_fd_tttrade <- tradeimpactplot_c+scale_y_continuous(breaks =c(-5,0,5),limits = c(-10,5))
+## main_fd_tttrade <- tradeimpactplot_c+scale_y_continuous(breaks =c(-5,0,5),limits = c(-10,5))
+
+main_fd_tttrade <- tradeimpactplot_c+scale_y_continuous(breaks =c(-50,0,50),limits = c(-100,50))
 ## tradeshare withou net
 ## use this
 ## main_fd_tttrade <- tradeimpactplot_c+scale_y_continuous(breaks =c(-5,0,5),limits = c(-20,20))
@@ -335,18 +344,20 @@ tdData$time <- tdData$tstop ## using fox
 cmod <- coxph(Surv(tstart, tstop, quit) ~ traderatio+issuesalience1+issuesalience2+traderatio:issuesalience1+traderatio:issuesalience2+joint_demo+contbinary+powerratio+defenseratio+cluster(crisno), data=tdData);summary(cmod)
 cox.zph(cmod,transform='rank')
 
+cmodform <- update.formula(cmod, ~.+tcontbinary+tpowerratio+tissuesalience1+tissuesalience2+
+                             traderatio:tissuesalience1+traderatio:tissuesalience2)
 ## select the best model
 lam <- seq(0, 99, len=100)
 logL <- aic <- bic <- numeric(length(lam))
 for (i in 1:length(lam)) {
   #tdData$ttraderatio <- tdData$traderatio*log(tdData$time+lam)
-  tdData$tcontbinary <- tdData$contbinary*log(tdData$time+lam)
-  tdData$tpowerratio <- tdData$powerratio*log(tdData$time+lam)
-  tdData$tissuesalience1 <- tdData$issuesalience1*log(tdData$time+lam)
-  tdData$tissuesalience2 <- tdData$issuesalience2*log(tdData$time+lam)
+  lam0 <- lam[i]
+  tdData$tcontbinary <- tdData$contbinary*log(tdData$time+lam0)
+  tdData$tpowerratio <- tdData$powerratio*log(tdData$time+lam0)
+  tdData$tissuesalience1 <- tdData$issuesalience1*log(tdData$time+lam0)
+  tdData$tissuesalience2 <- tdData$issuesalience2*log(tdData$time+lam0)
   
-  fit <- coxph(update.formula(cmod, ~.+tcontbinary+tpowerratio+tissuesalience1+tissuesalience2+
-                                traderatio:tissuesalience1+traderatio:tissuesalience2), data=tdData)
+  fit <- coxph(cmodform, data=tdData)
   logL[i] <- logLik(fit)
   aic[i] <- AIC(fit)
   bic[i] <- BIC(fit)
@@ -358,8 +369,7 @@ tdData$tcontbinary <- tdData$contbinary*log(tdData$time+lamhat)
 tdData$tpowerratio <- tdData$powerratio*log(tdData$time+lamhat)
 tdData$tissuesalience1 <- tdData$issuesalience1*log(tdData$time+lamhat)
 tdData$tissuesalience2 <- tdData$issuesalience2*log(tdData$time+lamhat)
-cmod2 <- coxph(update.formula(cmod, ~.+tcontbinary+tpowerratio+tissuesalience1+tissuesalience2+
-                                traderatio:tissuesalience1+traderatio:tissuesalience2), data=tdData);summary(cmod2)
+cmod2 <- coxph(cmodform, data=tdData);summary(cmod2)
 
 
 
